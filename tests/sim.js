@@ -10,6 +10,7 @@ async function play(seed, opts) {
   const n = opts.players;
   const g = new PP.Game().setup({
     seed, size: opts.size, mapType: opts.mapType, difficulty: opts.difficulty || 'normal', victory: 'dominacao',
+    victories: opts.victories, scenario: opts.scenario,
     players: tribes.slice(0, n).map(t => ({ tribe: t, human: false })),
   });
   const t0 = Date.now();
@@ -48,6 +49,26 @@ function validate(g) {
     if (t.city !== c.id || t.owner !== c.owner) throw new Error('cidade inconsistente ' + c.name);
   }
   for (const p of g.players) if (p.stars < 0 || p.science < 0) throw new Error('recurso negativo ' + p.name);
+  // sistemas estendidos
+  const ids = new Set();
+  for (const u of g.units) {
+    if (ids.has(u.id)) throw new Error('unidade duplicada ' + u.id);
+    ids.add(u.id);
+    if (PP.UNITS[u.type].naval && !g.isWater(g.tileAt(u))) throw new Error('navio em terra ' + u.id);
+    for (const x of u.cargo || []) {
+      if (ids.has(x.id)) throw new Error('carga duplicada ' + x.id);
+      ids.add(x.id);
+      if (x.owner !== u.owner || x.x !== u.x || x.y !== u.y || x.dead) throw new Error('carga inconsistente ' + x.id);
+      if (g.uGrid[x.y * g.W + x.x] === x) throw new Error('carga na grade ' + x.id);
+    }
+  }
+  for (const r of g.routes || []) {
+    if (!g.cityMap[r.a] || !g.cityMap[r.b]) throw new Error('rota com cidade inexistente ' + r.id);
+    if (!g.players[r.owner].alive) throw new Error('rota de jogador morto ' + r.id);
+  }
+  for (const t of g.tiles) if (t.fort && (!g.players[t.fort.owner] || !g.players[t.fort.owner].alive)) throw new Error('forte sem dono vivo');
+  for (const c of g.cities) if (c.loyalty < 0 || c.loyalty > 100 || c.occupied < 0) throw new Error('lealdade inválida ' + c.name);
+  for (const p of g.players) if (!p.human && p.pendingRuin) throw new Error('IA com ruína pendente');
 }
 
 (async () => {
@@ -55,10 +76,16 @@ function validate(g) {
   const types = Object.keys(PP.MAP_TYPES), sizes = [14, 18, 22];
   const winners = {};
   for (let i = 0; i < games; i++) {
-    const opts = { size: sizes[i % sizes.length], mapType: types[i % types.length], players: 2 + (i % 5), turns };
+    // metade das partidas usa as regras originais (só dominação); a outra metade liga todas as vitórias e cenários
+    const all = i % 2 === 1;
+    const scen = Object.keys(PP.SCENARIOS);
+    const opts = { size: sizes[i % sizes.length], mapType: types[i % types.length], players: 2 + (i % 5), turns,
+      victories: all ? { dominacao: true, ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true } : undefined,
+      scenario: all ? scen[(i >> 1) % scen.length] : 'normal' };
+    if (opts.scenario === 'ultimo_reino') opts.scenario = 'mundo_hostil';
     const seed = 1000 + i * 7919;
     const { g, ms, rows } = await play(seed, opts);
-    console.log(`\n# jogo ${i} seed=${seed} ${opts.mapType} ${opts.size}x${opts.size} ${opts.players}j -> turno ${g.turn} ${g.over ? 'FIM vencedor=' + g.players[g.winner].name : ''} (${ms}ms)`);
+    console.log(`\n# jogo ${i} seed=${seed} ${opts.scenario} ${opts.mapType} ${opts.size}x${opts.size} ${opts.players}j -> turno ${g.turn} ${g.over ? 'FIM (' + g.endReason + ') vencedor=' + g.players[g.winner].name : ''} (${ms}ms)`);
     rows.forEach(r => console.log('  ' + r));
     if (g.over) winners[g.players[g.winner].tribe] = (winners[g.players[g.winner].tribe] || 0) + 1;
   }

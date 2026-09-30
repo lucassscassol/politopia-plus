@@ -7,17 +7,18 @@
   PP.VICTORIES = {
     dominacao:     { name: 'Dominação',    icon: 'v_domination', desc: 'Elimine todas as outras tribos.' },
     pontos:        { name: 'Pontos',       icon: 'v_score',      desc: 'Tenha a maior pontuação quando o limite de turnos acabar.' },
-    ciencia:       { name: 'Científica',   icon: 'v_science',    desc: 'Com Educação e 20 tecnologias, conclua as 3 etapas do Grande Observatório numa cidade científica.' },
+    ciencia:       { name: 'Científica',   icon: 'v_science',    desc: 'Com a árvore de tecnologias completa, conclua as 3 etapas do Grande Observatório numa cidade científica de nível 5 ou mais.' },
     economia:      { name: 'Econômica',    icon: 'v_economy',    desc: 'Acumule estrelas em rotas comerciais e mantenha ao menos uma rota com outra tribo.' },
-    maravilhas:    { name: 'Maravilhas',   icon: 'v_wonders',    desc: 'Possua 5 maravilhas ao mesmo tempo.' },
-    territorio:    { name: 'Territorial',  icon: 'v_territory',  desc: 'Controle 45% das terras do mapa por 5 turnos seguidos.' },
+    maravilhas:    { name: 'Maravilhas',   icon: 'v_wonders',    desc: 'Possua 6 das 8 maravilhas por 8 turnos seguidos (quem conquista a cidade leva a maravilha).' },
+    territorio:    { name: 'Territorial',  icon: 'v_territory',  desc: 'Controle a maior parte das terras do mapa por 8 turnos seguidos (63% com 2 tribos, até 45% com 5 ou mais).' },
     diplomacia:    { name: 'Diplomática',  icon: 'v_diplomacy',  desc: 'Com 3+ tribos vivas: aliança com metade das outras, nenhuma guerra e reputação positiva por 5 turnos seguidos.' },
     sobrevivencia: { name: 'Sobrevivência', icon: 'v_survival',  desc: 'Resista até o turno limite do cenário.' },
   };
-  PP.SCIENCE_PROJECT = { name: 'Grande Observatório', stages: [30, 45, 60], tech: 'educacao', minTechs: 20 };
+  PP.SCIENCE_PROJECT = { name: 'Grande Observatório', stages: [150, 250, 350], tech: 'educacao', minTechs: PP.TECHS.length, gap: 3, minLevel: 5 };
+  PP.WONDER_HOLD = 8;
   PP.HOLD_TURNS = 5;
-  PP.TERRITORY_SHARE = 0.45;
-  PP.WONDERS_TO_WIN = 5;
+  PP.TERRITORY_HOLD = 8;
+  PP.WONDERS_TO_WIN = 6;
 
   const V = {
     victoryEnabled(id) {
@@ -32,7 +33,8 @@
       if (!p.project) p.project = { stage: 0, last: -1 };
     },
 
-    economicGoal() { return 350 + 50 * Math.max(0, this.players.length - 2); },
+    economicGoal() { return 1000 + 150 * Math.max(0, this.players.length - 2); },
+    territoryGoal() { return Math.max(0.45, 0.75 - 0.06 * this.players.length); },
 
     hasForeignRoute(pid) {
       return (this.routes || []).some(r => r.active && r.kind === 'foreign' && (r.owner === pid || r.partner === pid));
@@ -61,19 +63,26 @@
     },
 
     // ------------------------------------------------------------ Grande Observatório
+    // Custo das etapas cresce com o tamanho do mapa (mapas maiores = partidas mais longas)
+    projectCost(stage) {
+      const P = PP.SCIENCE_PROJECT;
+      return Math.round(P.stages[Math.min(stage, P.stages.length - 1)] * Math.max(1, this.W / 18) / 10) * 10;
+    },
+
     projectCheck(p, c) {
       this.ensureVictory(p);
       const P = PP.SCIENCE_PROJECT;
       const stage = p.project.stage;
-      const r = { ok: false, reason: '', cost: P.stages[Math.min(stage, P.stages.length - 1)], stage };
+      const r = { ok: false, reason: '', cost: this.projectCost(stage), stage };
       if (!this.victoryEnabled('ciencia')) { r.reason = 'Vitória científica desativada'; r.hidden = true; return r; }
       if (stage >= P.stages.length) { r.reason = 'Concluído'; return r; }
       if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
       if (c.spec !== 'ciencia') { r.reason = 'Exige cidade Científica'; return r; }
+      if (c.level < P.minLevel) { r.reason = `Exige cidade de nível ${P.minLevel}`; return r; }
       if (!this.has(p, P.tech)) { r.reason = 'Requer ' + PP.TECH[P.tech].name; r.locked = true; return r; }
       const n = Object.keys(p.techs).length;
-      if (n < P.minTechs) { r.reason = `Requer ${P.minTechs} tecnologias (${n})`; r.locked = true; return r; }
-      if (p.project.last === this.turn) { r.reason = 'Uma etapa por turno'; return r; }
+      if (n < P.minTechs) { r.reason = `Requer a árvore completa (${n}/${P.minTechs})`; r.locked = true; return r; }
+      if (p.project.last >= 0 && this.turn - p.project.last < P.gap) { r.reason = `Próxima etapa no turno ${p.project.last + P.gap}`; return r; }
       if (p.science < r.cost) { r.reason = 'Falta ciência'; return r; }
       r.ok = true;
       return r;
@@ -95,12 +104,7 @@
     },
 
     // ------------------------------------------------------------ Verificações
-    checkInstantVictories() {
-      if (this.over || !this.opts.victories) return;
-      if (this.victoryEnabled('maravilhas')) {
-        for (const p of this.players) if (p.alive && this.wondersOwned(p.id) >= PP.WONDERS_TO_WIN) { this.finish(p.id, 'maravilhas'); return; }
-      }
-    },
+    checkInstantVictories() { /* todas as vitórias alternativas pedem tempo de manutenção ou etapas: veja checkRoundVictories */ },
 
     checkRoundVictories() {
       if (this.over || !this.opts.victories) return;
@@ -110,11 +114,18 @@
         const h = p.vhold;
         if (this.victoryEnabled('territorio')) {
           const share = this.landShare(p.id);
-          if (share >= PP.TERRITORY_SHARE) {
+          if (share >= this.territoryGoal()) {
             h.territorio = (h.territorio || 0) + 1;
-            if (h.territorio === 1) this.log(`${p.name} controla ${Math.round(share * 100)}% das terras! Vitória territorial em ${PP.HOLD_TURNS} turnos.`, null);
-            if (h.territorio >= PP.HOLD_TURNS) { this.finish(p.id, 'territorio'); return; }
+            if (h.territorio === 1) this.log(`${p.name} controla ${Math.round(share * 100)}% das terras! Vitória territorial em ${PP.TERRITORY_HOLD} turnos.`, null);
+            if (h.territorio >= PP.TERRITORY_HOLD) { this.finish(p.id, 'territorio'); return; }
           } else h.territorio = 0;
+        }
+        if (this.victoryEnabled('maravilhas')) {
+          if (this.wondersOwned(p.id) >= PP.WONDERS_TO_WIN) {
+            h.maravilhas = (h.maravilhas || 0) + 1;
+            if (h.maravilhas === 1) this.log(`${p.name} reúne ${PP.WONDERS_TO_WIN} maravilhas! Vitória em ${PP.WONDER_HOLD} turnos se ninguém tomar as cidades delas.`, null);
+            if (h.maravilhas >= PP.WONDER_HOLD) { this.finish(p.id, 'maravilhas'); return; }
+          } else h.maravilhas = 0;
         }
         if (this.victoryEnabled('diplomacia')) {
           if (this.diplomaticStanding(p.id).ok) {
@@ -146,9 +157,9 @@
       }
       if (this.victoryEnabled('ciencia')) {
         const P = PP.SCIENCE_PROJECT, n = Object.keys(p.techs).length;
-        const pre = Math.min(1, n / P.minTechs) * (this.has(p, P.tech) ? 1 : 0.8);
+        const pre = Math.min(1, n / P.minTechs);
         add('ciencia', p.project.stage ? 0.4 + 0.6 * p.project.stage / P.stages.length : pre * 0.4,
-          p.project.stage ? `${P.name}: etapa ${p.project.stage}/${P.stages.length}` : `${n}/${P.minTechs} tecnologias${this.has(p, P.tech) ? '' : ' · falta Educação'}`);
+          p.project.stage ? `${P.name}: etapa ${p.project.stage}/${P.stages.length}` : `${Math.min(n, P.minTechs)}/${P.minTechs} tecnologias`);
       }
       if (this.victoryEnabled('economia')) {
         const goal = this.economicGoal(), cur = p.stats.tradeIncome || 0;
@@ -156,12 +167,13 @@
       }
       if (this.victoryEnabled('maravilhas')) {
         const n = this.wondersOwned(p.id);
-        add('maravilhas', n / PP.WONDERS_TO_WIN, `${n}/${PP.WONDERS_TO_WIN} maravilhas`);
+        add('maravilhas', Math.min(1, n / PP.WONDERS_TO_WIN) * 0.8 + (p.vhold.maravilhas || 0) / PP.WONDER_HOLD * 0.2,
+          `${n}/${PP.WONDERS_TO_WIN} maravilhas` + (p.vhold.maravilhas ? ` · ${p.vhold.maravilhas}/${PP.WONDER_HOLD} turnos` : ''));
       }
       if (this.victoryEnabled('territorio')) {
-        const s = this.landShare(p.id);
-        add('territorio', (s / PP.TERRITORY_SHARE) * 0.8 + (p.vhold.territorio || 0) / PP.HOLD_TURNS * 0.2,
-          `${Math.round(s * 100)}% de ${Math.round(PP.TERRITORY_SHARE * 100)}% das terras` + (p.vhold.territorio ? ` · ${p.vhold.territorio}/${PP.HOLD_TURNS} turnos` : ''));
+        const s = this.landShare(p.id), goal = this.territoryGoal();
+        add('territorio', Math.min(1, s / goal) * 0.8 + (p.vhold.territorio || 0) / PP.TERRITORY_HOLD * 0.2,
+          `${Math.round(s * 100)}% de ${Math.round(goal * 100)}% das terras` + (p.vhold.territorio ? ` · ${p.vhold.territorio}/${PP.TERRITORY_HOLD} turnos` : ''));
       }
       if (this.victoryEnabled('diplomacia')) {
         const d = this.diplomaticStanding(p.id);
@@ -208,7 +220,9 @@
     init(g) { g.players.forEach(p => g.ensureVictory(p)); },
     load(g) { g.players.forEach(p => g.ensureVictory(p)); },
     newRound(g) { g.checkRoundVictories(); },
-    checkVictory(g) { g.checkInstantVictories(); },
-    wonder(g) { g.checkInstantVictories(); },
+    // quem conquista uma cidade leva as maravilhas do território dela
+    capture(g, c, old, p) {
+      for (const t of g.tiles) if (t.cityId === c.id && t.wonder && g.wonders[t.wonder] === old.id) g.wonders[t.wonder] = p.id;
+    },
   });
 })(typeof globalThis !== 'undefined' ? (globalThis.PP = globalThis.PP || {}) : (window.PP = window.PP || {}));

@@ -428,30 +428,35 @@ function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p));
     const all = { dominacao: true, ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true };
     let g = blank({ players: 3, victories: all });
     city(g, 0, 1, 1, true); city(g, 1, 12, 12, true); city(g, 2, 1, 12, true);
-    Object.keys(PP.WONDERS).slice(0, 5).forEach(w => { g.wonders[w] = 0; });
+    Object.keys(PP.WONDERS).slice(0, PP.WONDERS_TO_WIN).forEach(w => { g.wonders[w] = 0; });
     g.checkVictory();
+    ok(!g.over, 'maravilhas precisam ser mantidas por alguns turnos');
+    for (let i = 0; i < PP.WONDER_HOLD && !g.over; i++) { g.turn++; g.checkRoundVictories(); }
     ok(g.over && g.endReason === 'maravilhas' && g.winner === 0, 'vitória por maravilhas');
     g = blank({ players: 2, victories: all });
     const c = city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
     const p = g.players[0];
     PP.TECHS.forEach(t => { p.techs[t.id] = true; });
-    c.level = 3; g.setSpec(p, c, 'ciencia');
+    c.level = 5; g.setSpec(p, c, 'ciencia');
     p.science = 1000;
     for (let i = 0; i < 3 && !g.over; i++) {
       ok(g.advanceProject(p, c), 'etapa ' + (i + 1) + ' do projeto');
-      ok(!g.advanceProject(p, c), 'uma etapa por turno');
+      ok(!g.advanceProject(p, c), 'etapas espaçadas');
       p.project.last = -1;
     }
     ok(g.over && g.endReason === 'ciencia', 'vitória científica');
     g = blank({ players: 2, victories: all });
     city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
-    for (const t of g.tiles) if (t.x < 10) t.owner = 0;
-    for (let i = 0; i < PP.HOLD_TURNS && !g.over; i++) { g.turn++; g.checkRoundVictories(); }
+    for (const t of g.tiles) if (t.x < 11) t.owner = 0;
+    ok(g.landShare(0) >= g.territoryGoal(), 'território acima da meta');
+    for (let i = 0; i < PP.TERRITORY_HOLD - 1 && !g.over; i++) { g.turn++; g.checkRoundVictories(); }
+    ok(!g.over, 'ainda mantendo o território');
+    g.turn++; g.checkRoundVictories();
     ok(g.over && g.endReason === 'territorio', 'vitória territorial após manter o território');
     g = blank({ players: 2 });
     city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
     Object.keys(PP.WONDERS).forEach(w => { g.wonders[w] = 0; });
-    g.checkVictory();
+    for (let i = 0; i < 10; i++) { g.turn++; g.checkRoundVictories(); g.checkVictory(); }
     ok(!g.over, 'partida sem vitórias extras (compatível) não termina por maravilhas');
     ok(g.victoryProgress(g.players[0]).length >= 1, 'progresso de vitória disponível');
   });

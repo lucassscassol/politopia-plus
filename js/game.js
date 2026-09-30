@@ -1022,7 +1022,7 @@
     techCost(p, id) {
       const t = PP.TECH[id];
       let c = PP.TECH_BASE[t.tier] + t.tier * 1.5 * Math.max(1, this.citiesOf(p.id).length);
-      if (p.tribe === 'hanlu') c *= 0.9;
+      if (p.tribe === 'hanlu') c *= 0.85;
       if (this.has(p, 'filosofia')) c *= 0.85;
       if (this.techCostMult) c *= this.techCostMult(p, id);
       return Math.max(1, Math.round(c));

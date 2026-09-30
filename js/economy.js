@@ -81,12 +81,13 @@
       stars += tileIncome;
       let sci = 1 + Math.floor(c.level / 2) + (c.capital ? 1 : 0) + c.academy +
         (c.buildings.library ? 2 : 0) + (c.buildings.university ? 3 : 0);
-      // --- construções exclusivas de especialização (só valem com a especialização ativa)
+      // --- construções exclusivas de especialização (só valem com a especialização ativa; somam depois do %)
+      let specStars = 0, specSci = 0;
       for (const id in c.buildings) {
         const b = PP.BUILDINGS[id];
         if (!b || !b.spec || !this.specActive(c, id)) continue;
-        if (b.gold) stars += b.gold;
-        if (b.sci) sci += b.sci;
+        if (b.gold) specStars += b.gold;
+        if (b.sci) specSci += b.sci;
       }
       // --- marcos e metrópole
       const m = c.milestones || {};
@@ -98,16 +99,17 @@
       // --- especialização
       switch (c.spec) {
         case 'comercio': {
-          const add = Math.round(stars * 0.4);
+          const add = Math.round(stars * 0.3);
           stars += add; sci -= 1;
           notes.push(`Comercial +${add}★ −1⚗`);
           break;
         }
         case 'ciencia': {
           sci += (c.buildings.library ? 1 : 0) + (c.buildings.university ? 1 : 0);
-          const add = Math.max(2, Math.round(sci * 0.5));
-          sci += add;
-          notes.push(`Científica +${add}⚗`);
+          const add = Math.max(2, Math.round(sci * 0.25));
+          const cut = Math.round(stars * 0.3);
+          sci += add; stars -= cut;
+          notes.push(`Científica +${add}⚗ −${cut}★`);
           break;
         }
         case 'militar': {
@@ -125,6 +127,7 @@
           break;
         }
       }
+      stars += specStars; sci += specSci;
       const res = { stars, sci, notes };
       if (this.eventCityIncome) this.eventCityIncome(c, res);
       // --- ocupação, resistência e sabotagem
@@ -230,13 +233,13 @@
       return 0;
     },
 
-    // Gemas barateiam (−10% por garimpo, máx. 30%); cada maravilha que a tribo já tem encarece a próxima em 4★
+    // Gemas barateiam (−10% por garimpo, máx. 30%); cada maravilha que a tribo já tem encarece a próxima em 10★
     wonderCost(p, wid) {
       const base = PP.WONDERS[wid].cost;
       const gems = Math.min(3, this.resourceAccess(p).gems || 0);
       let owned = 0;
       for (const w in this.wonders) if (this.wonders[w] === p.id) owned++;
-      return Math.max(1, Math.round(base * (1 - 0.1 * gems)) + owned * 4);
+      return Math.max(1, Math.round(base * (1 - 0.1 * gems)) + owned * 10);
     },
 
     // ============================================================ Rotas comerciais
@@ -250,7 +253,7 @@
       if (this.specActive(c, 'guild')) n++;
       if (this.specActive(c, 'customs')) n++;
       if (c.milestones && c.milestones.m_bourse) n++;
-      if (p.tribe === 'qadir') n++;
+      if (p.tribe === 'qadir' && c.capital) n++;
       return n;
     },
 

@@ -179,7 +179,7 @@
     { id: 'burn',       name: 'Queimar floresta',  icon: '🔥', cost: 5, tech: 'construcao',  terrain: ['forest'], noImp: true, toTerrain: 'plains', newRes: 'crop' },
     { id: 'plant',      name: 'Plantar floresta',  icon: '🌳', cost: 5, tech: 'silvicultura', terrain: ['plains'], empty: true, toTerrain: 'forest' },
     { id: 'drain',      name: 'Drenar pântano',    icon: '💧', cost: 4, tech: 'agricultura', terrain: ['swamp'], noImp: true, toTerrain: 'plains', newRes: 'crop' },
-    { id: 'terrace',    name: 'Terraços',          icon: '🌾', cost: 5, tech: 'agricultura', terrain: ['hills'], empty: true, pop: 2, imp: 'terrace', tribe: 'aymara' },
+    { id: 'terrace',    name: 'Terraços',          icon: '🌾', cost: 5, tech: 'agricultura', terrain: ['hills'], empty: true, pop: 1, imp: 'terrace', tribe: 'aymara' },
     { id: 'tower',      name: 'Torre de vigia',    icon: '🗼', cost: 4, tech: 'estrategia',  fort: 'tower' },
     { id: 'outpost',    name: 'Posto avançado',    icon: '⛺', cost: 5, tech: 'estradas',    fort: 'outpost' },
     { id: 'fort',       name: 'Forte',             icon: '🏰', cost: 8, tech: 'estrategia',  fort: 'fort' },
@@ -236,8 +236,8 @@
   // Cada especialização tem bônus claros e um custo claro: uma cidade não pode ser boa em tudo.
   PP.SPECS = {
     militar:  { name: 'Militar',    icon: 'sp_militar',  bonus: '+2 capacidade · recrutas −1★ e +1 XP · defesa +0,5', cost: 'ciência da cidade pela metade' },
-    ciencia:  { name: 'Científica', icon: 'sp_ciencia',  bonus: '+50% de ciência (mín. +2) · bibliotecas e universidades +1⚗\uFE0E', cost: '−1 capacidade · recrutas +1★' },
-    comercio: { name: 'Comercial',  icon: 'sp_comercio', bonus: '+40% de estrelas · +1 vaga de rota · rotas desta cidade +1★', cost: '−1⚗\uFE0E · defesa −0,25' },
+    ciencia:  { name: 'Científica', icon: 'sp_ciencia',  bonus: '+25% de ciência (mín. +2) · bibliotecas e universidades +1⚗\uFE0E', cost: '−30% de estrelas · −1 capacidade · recrutas +1★' },
+    comercio: { name: 'Comercial',  icon: 'sp_comercio', bonus: '+30% de estrelas · +1 vaga de rota · rotas desta cidade +1★', cost: '−1⚗\uFE0E · defesa −0,25' },
     agricola: { name: 'Agrícola',   icon: 'sp_agricola', bonus: '+1 população a cada 4 turnos · Celeiro pela metade · +5 de lealdade', cost: '−1★ · −1⚗\uFE0E' },
     porto:    { name: 'Portuária',  icon: 'sp_porto',    bonus: 'Couraçados · +1★ por porto, peixe ou baleia (máx. 3) · navios +1 movimento · +1 vaga de rota marítima', cost: 'tropas terrestres +1★', coastal: true },
   };
@@ -339,7 +339,7 @@
     aymara: {
       name: 'Aymará', color: '#9e3a2f', dark: '#5a1f19', emblem: '🦙', startTech: 'escalada', extraTech: 'mineracao', startUnit: 'warrior',
       perk: 'Povo das montanhas: Minas e Garimpos dão +1 população extra.',
-      unique: 'Caminhos de pedra: suas tropas cruzam montanhas com custo 1 e ganham +1 de visão nelas; constroem Terraços em colinas (+2 população).',
+      unique: 'Caminhos de pedra: suas tropas cruzam montanhas com custo 1 e ganham +1 de visão nelas; constroem Terraços em colinas vazias (+1 população).',
       biome: { base: 'plains', alt: 'tundra', altFrac: 0.15, mountain: 0.2, hills: 0.2, forest: 0.18, swamp: 0.0 },
       tint: '#8a7d5c', resBias: { ore: 2, gems: 1.6, horses: 1.2 },
       syl: [['Pa', 'Chu', 'Qui', 'Ti', 'Ay', 'U', 'Ko', 'Pu', 'Ma', 'Il', 'Sa', 'Wa'], ['ta', 'ni', 'llo', 'ka', 'ma', 'ra', 'wa', 'qa', 'yu', 'ri'], ['pampa', 'marka', 'wasi', 'quta', 'llacta', 'kancha', '']],
@@ -363,14 +363,14 @@
     qadir: {
       name: 'Qadir', color: '#b58a36', dark: '#6a4f1c', emblem: '🐪', startTech: 'montaria', startUnit: 'rider',
       perk: 'Mercadores das dunas: a capital gera +2★ e cada cidade conectada por estrada ou porto gera +1★ extra.',
-      unique: 'Caravanas: +1 vaga de rota em todas as cidades e o comércio com os Qadir melhora a relação em dobro.',
+      unique: 'Caravanas: +1 vaga de rota na capital e o comércio com os Qadir melhora a relação em dobro.',
       biome: { base: 'desert', alt: 'plains', altFrac: 0.2, mountain: 0.07, hills: 0.13, forest: 0.05, swamp: 0.0 },
       tint: '#a8905f', resBias: { horses: 1.8, gems: 1.6, crop: 0.8 },
       syl: [['Al', 'Qa', 'Sa', 'Mar', 'Zu', 'Ha', 'Ka', 'Ra', 'Da', 'Ja', 'Ba', 'Na'], ['sh', 'dir', 'ma', 'bar', 'ha', 'ra', 'zi', 'li'], ['kand', 'abad', 'ira', 'un', 'ar', 'at', '']],
     },
     hanlu: {
       name: 'Han-Lu', color: '#6f5391', dark: '#3d2c52', emblem: '🐉', startTech: 'organizacao', startUnit: 'warrior',
-      perk: 'Império de jade: tecnologias custam 10% menos.',
+      perk: 'Império de jade: tecnologias custam 15% menos.',
       unique: 'Difusão do saber: tecnologias já conhecidas por tribos que você encontrou custam mais 20% menos; cidades científicas não perdem capacidade.',
       biome: { base: 'plains', alt: 'hills', altFrac: 0.05, mountain: 0.1, hills: 0.1, forest: 0.22, swamp: 0.05 },
       tint: '#6f8350', resBias: { crop: 1.8, fruit: 1.2, spices: 1.2 },
