@@ -192,7 +192,7 @@
       const w = this.toWorld(sx, sy);
       let best = null;
       for (const u of g.units) {
-        if (u.owner !== this.viewer && !this.visibleTo(u.x, u.y)) continue;
+        if (!this.unitShown(u)) continue;
         const p = this.tilePosW(u);
         if (Math.abs(w.x - p.x) <= 19 && w.y >= p.y - 46 && w.y <= p.y + 4) {
           if (!best || u.x + u.y > best.x + best.y) best = u;
@@ -238,6 +238,23 @@
     }
 
     clearHighlights() { this.hl = { selected: null, reach: null, attack: null, convert: null, hover: this.hl ? this.hl.hover : null }; this.dirty = true; }
+
+    // Unidade aparece para quem está olhando? (visão, furtividade de espiões e tropas na mata)
+    unitShown(u) {
+      if (this.viewer === -9) return false;
+      if (this.viewer < 0) return true;
+      if (u.owner === this.viewer) return true;
+      return this.game.unitVisibleTo ? this.game.unitVisibleTo(u, this.viewer) : this.visibleTo(u.x, u.y);
+    }
+
+    // Nível de névoa de uma casa já explorada: 0 visível, 1 inteligência recente, 2 antiga
+    fogLevel(t) {
+      if (this.visibleTo(t.x, t.y)) return 0;
+      if (this.viewer < 0) return 2;
+      const g = this.game, p = g.players[this.viewer];
+      if (p && p.lastSeen && g.fogState && g.fogState(p, t.y * g.W + t.x) === PP.FOG.RECENT) return 1;
+      return 2;
+    }
 
     visibleTo(x, y) {
       if (this.viewer < 0 && this.viewer !== -9) return true;
@@ -319,6 +336,25 @@
         case 'ruin':
           if (this.visibleTo(d.tile.x, d.tile.y)) this.ring(d.tile.x, d.tile.y, GOLD, now);
           break;
+        case 'pillage':
+          if (this.visibleTo(d.tile.x, d.tile.y)) { this.ring(d.tile.x, d.tile.y, '#d0703f', now); this.float(d.tile.x, d.tile.y, 'Saque +' + d.loot + '★', '#e6a36a', now); }
+          break;
+        case 'ability':
+          if (this.visibleTo(d.unit.x, d.unit.y) && (d.unit.owner === this.viewer || !(this.game.isStealthed && this.game.isStealthed(d.unit)))) {
+            this.float(d.unit.x, d.unit.y, PP.ABILITIES[d.ability].name, '#e6c886', now, 0.95);
+            for (const h of d.hits) { this.float(h.x, h.y, '−' + h.dmg, BLOOD, now + 150); if (h.unit.dead) this.ghost(h.unit, now + 150); }
+            for (const h of d.healed) if (h.amount > 0) this.float(h.unit.x, h.unit.y, '+' + h.amount, MOSS, now + 100);
+          }
+          break;
+        case 'attrition':
+          if (d.unit.owner === this.viewer) this.float(d.unit.x, d.unit.y, '−1 frio', '#b7c3c6', now, 0.85);
+          break;
+        case 'fortTaken':
+          if (this.visibleTo(d.tile.x, d.tile.y)) this.ring(d.tile.x, d.tile.y, GOLD, now);
+          break;
+        case 'spy':
+          if (d.unit.owner === this.viewer && !d.caught) this.float(d.unit.x, d.unit.y, 'Missão cumprida', '#c9a6e0', now, 0.9);
+          break;
       }
     }
 
@@ -398,10 +434,12 @@
         }
       }
       for (const t of list) this.drawTile(ctx, t, detail);
+      this.drawRoutes(ctx);
       this.drawHighlights(ctx, now);
+      this.drawSightings(ctx, now);
       const units = [];
       for (const u of g.units) {
-        if (u.owner !== this.viewer && !this.visibleTo(u.x, u.y) && !this.anims.some(a => a.unit === u)) continue;
+        if (!this.unitShown(u) && !(u.owner !== this.viewer && this.visibleTo(u.x, u.y) && this.anims.some(a => a.unit === u) && !(g.isStealthed && g.isStealthed(u)))) continue;
         units.push(u);
       }
       units.sort((a, b) => (a.x + a.y) - (b.x + b.y));
@@ -553,6 +591,7 @@
         if (detail) { diamond(ctx, c.x, top); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.stroke(); }
       }
       if (t.owner >= 0) this.drawTerritory(ctx, t, c.x, top);
+      if (t.landmark === 'vau') this.drawBridge(ctx, t, c.x, top);
       if (t.road) this.drawRoad(ctx, t, c.x, top);
       if (detail) this.drawFeature(ctx, t, c.x, top);
       else if (t.city || t.village) this.drawSettlement(ctx, t, c.x, top);
@@ -560,9 +599,100 @@
         const s = this.resSprite(t.res);
         blit(ctx, s, c.x + (t.terrain === 'mountain' ? 16 : 0), top - (t.terrain === 'forest' ? 2 : 0));
       }
-      if (!this.visibleTo(t.x, t.y)) {
+      if (t.pillaged) this.drawPillaged(ctx, c.x, top);
+      if (t.landmark && detail) this.drawLandmark(ctx, t, c.x, top);
+      const fog = this.fogLevel(t);
+      if (fog) {
         diamond(ctx, c.x, top);
-        ctx.fillStyle = 'rgba(12,10,9,0.5)'; ctx.fill();
+        ctx.fillStyle = fog === 1 ? 'rgba(12,10,9,0.36)' : 'rgba(12,10,9,0.56)'; ctx.fill();
+      }
+    }
+
+    // Ponte antiga sobre o vau
+    drawBridge(ctx, t, cx, top) {
+      const g = this.game;
+      // a ponte segue a direção do primeiro par de margens opostas
+      let ax = -1, ay = -1;
+      for (const d of PP.DIRS) {
+        const a = g.tile(t.x + d[0], t.y + d[1]), b = g.tile(t.x - d[0], t.y - d[1]);
+        if (a && b && !TER[a.terrain].water && !TER[b.terrain].water) {
+          const wa = this.worldOf(a.x, a.y), wc = this.worldOf(t.x, t.y);
+          ax = Math.sign(wa.x - wc.x); ay = Math.sign(wa.y - wc.y);
+          if (!ax && !ay) ax = -1;
+          break;
+        }
+      }
+      ctx.save();
+      ctx.strokeStyle = '#2a241d'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx + ax * TW * 0.34, top + ay * TH * 0.34); ctx.lineTo(cx - ax * TW * 0.34, top - ay * TH * 0.34); ctx.stroke();
+      ctx.strokeStyle = '#8a8274'; ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(40,34,28,0.7)'; ctx.lineWidth = 1;
+      for (let k = -3; k <= 3; k++) {
+        const px = cx + ax * TW * 0.1 * k, py = top + ay * TH * 0.1 * k;
+        ctx.beginPath(); ctx.moveTo(px - ay * 5, py + ax * 2.5); ctx.lineTo(px + ay * 5, py - ax * 2.5); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    drawPillaged(ctx, cx, top) {
+      ctx.save();
+      diamond(ctx, cx, top, 0.55);
+      ctx.fillStyle = 'rgba(20,12,8,0.45)'; ctx.fill();
+      drawIcon(ctx, 'a_pillage', cx - 16, top - 10, 16, '#d0703f', 'rgba(10,8,6,0.8)');
+      ctx.restore();
+    }
+
+    drawLandmark(ctx, t, cx, top) {
+      const def = PP.LANDMARKS[t.landmark];
+      if (!def) return;
+      const x = cx + 26, y = top - 4;
+      ctx.save();
+      ctx.fillStyle = 'rgba(14,11,9,0.85)';
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(201,164,92,0.8)'; ctx.lineWidth = 1.2; ctx.stroke();
+      drawIcon(ctx, def.icon, x, y, 12, '#e6c886');
+      ctx.restore();
+    }
+
+    // Rotas comerciais do jogador (e as que chegam às cidades dele)
+    drawRoutes(ctx) {
+      const g = this.game;
+      if (!g.routes || !g.routes.length || this.viewer === -9) return;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const r of g.routes) {
+        if (this.viewer >= 0 && r.owner !== this.viewer && r.partner !== this.viewer) continue;
+        if (!r.path || r.path.length < 2) continue;
+        const col = !r.active ? '#c4513f' : r.threat ? '#d09a3a' : '#e0bd6e';
+        ctx.beginPath();
+        r.path.forEach((i, k) => { const p = this.tilePosW(g.tiles[i]); if (k) ctx.lineTo(p.x, p.y - 3); else ctx.moveTo(p.x, p.y - 3); });
+        ctx.strokeStyle = 'rgba(10,8,6,0.55)'; ctx.lineWidth = 5; ctx.setLineDash([]); ctx.stroke();
+        ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.setLineDash([7, 6]); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Tropas inimigas vistas há pouco (inteligência recente), desenhadas como fantasmas
+    drawSightings(ctx) {
+      const g = this.game;
+      if (this.viewer < 0 || !g.ghostsFor) return;
+      const p = g.players[this.viewer];
+      if (!p) return;
+      for (const s of g.ghostsFor(p)) {
+        const t = g.tile(s.x, s.y);
+        if (!t || !this.exploredBy(s.y * g.W + s.x)) continue;
+        const pos = this.tilePosW(t);
+        const spr = this.tokenSprite('u_' + s.type, g.players[s.owner].tribe, true);
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.18, 0.5 - s.age * 0.07);
+        blit(ctx, spr, pos.x, pos.y - 22);
+        ctx.globalAlpha = 0.8;
+        ctx.font = `700 10px ${FONT_B}`; ctx.textAlign = 'center';
+        ctx.fillStyle = BONE; ctx.strokeStyle = 'rgba(10,8,6,0.85)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+        const txt = s.age <= 0 ? 'agora' : `há ${s.age}t`;
+        ctx.strokeText(txt, pos.x, pos.y + 4); ctx.fillText(txt, pos.x, pos.y + 4);
+        ctx.restore();
       }
     }
 
@@ -780,6 +910,43 @@
         blit(ctx, this.featureSprite(t), cx, top);
       }
       if (t.ruin) this.drawRuin(ctx, cx, top);
+      if (t.fort) this.drawFort(ctx, t, cx, top);
+      if (t.shrine != null && t.shrine >= 0) drawIcon(ctx, 'rw_scholars', cx - 22, top - 6, 16, '#c9d6e8', 'rgba(10,8,6,0.8)');
+    }
+
+    drawFort(ctx, t, cx, top) {
+      const f = t.fort, g = this.game;
+      const col = g.players[f.owner] ? g.players[f.owner].color : '#777';
+      const key = 'fort|' + f.type + '|' + col;
+      let s = this.sprites.get(key);
+      if (!s) {
+        s = makeSprite(90, 110, 45, 80, x => {
+          x.fillStyle = 'rgba(0,0,0,0.3)'; x.beginPath(); x.ellipse(0, 6, 28, 9, 0, 0, Math.PI * 2); x.fill();
+          const stone = '#8a8274', dark = '#4f4a42';
+          if (f.type === 'tower') {
+            x.fillStyle = dark; x.fillRect(-7, -38, 14, 42);
+            x.fillStyle = stone; x.fillRect(-7, -38, 8, 42);
+            x.fillStyle = '#a39b8b'; for (let k = -1; k <= 1; k++) x.fillRect(-8 + (k + 1) * 6, -43, 4, 5);
+            this.banner(x, 0, -42, 14, col);
+          } else if (f.type === 'outpost') {
+            x.strokeStyle = '#5a4430'; x.lineWidth = 3;
+            for (let k = -3; k <= 3; k++) { x.beginPath(); x.moveTo(k * 7, 6 - Math.abs(k) * 1.5); x.lineTo(k * 7, -8 - Math.abs(k) * 1.5); x.stroke(); }
+            x.fillStyle = '#7a6440'; x.beginPath(); x.moveTo(-12, -4); x.lineTo(0, -22); x.lineTo(12, -4); x.closePath(); x.fill();
+            this.banner(x, 14, -8, 16, col);
+          } else {
+            const big = f.type === 'fortress';
+            x.strokeStyle = dark; x.lineWidth = big ? 7 : 5;
+            diamond(x, 0, 0, big ? 0.58 : 0.46); x.stroke();
+            x.strokeStyle = stone; x.lineWidth = big ? 4 : 3;
+            diamond(x, 0, -3, big ? 0.58 : 0.46); x.stroke();
+            this.drawHouse(x, 0, 2, big ? 1.1 : 0.85, { tall: true, flat: true, wall: '#9a9282' });
+            if (big) { this.drawHouse(x, -18, 2, 0.6, { tall: true, flat: true, wall: '#8a8274' }); this.drawHouse(x, 18, 2, 0.6, { tall: true, flat: true, wall: '#8a8274' }); }
+            this.banner(x, 2, big ? -26 : -18, 16, col);
+          }
+        });
+        this.sprites.set(key, s);
+      }
+      blit(ctx, s, cx, top);
     }
 
     // ---------------------------------------------------------- Construções
@@ -911,6 +1078,21 @@
 
     drawImprovement(ctx, t, cx, top) {
       const imp = t.imp;
+      if (imp === 'whalestation') {
+        ctx.fillStyle = '#3d2e20';
+        ctx.beginPath(); ctx.moveTo(cx - 18, top + 2); ctx.lineTo(cx, top + 10); ctx.lineTo(cx + 18, top + 2); ctx.lineTo(cx, top - 6); ctx.closePath(); ctx.fill();
+        drawIcon(ctx, 'a_whaling', cx, top - 10, 20, '#b7c3c6', 'rgba(10,8,6,0.7)');
+        return;
+      }
+      if (imp === 'terrace') {
+        ctx.save();
+        diamond(ctx, cx, top, 0.78); ctx.clip();
+        ctx.fillStyle = 'rgba(96,110,50,0.5)'; ctx.fill();
+        ctx.strokeStyle = '#5b4a30'; ctx.lineWidth = 2.5;
+        for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.ellipse(cx, top + k * 6, 40, 8, 0, Math.PI, 0); ctx.stroke(); }
+        ctx.restore();
+        return;
+      }
       if (imp === 'farm' || imp === 'plantation') {
         ctx.save();
         diamond(ctx, cx, top, 0.8); ctx.clip();
@@ -1072,14 +1254,16 @@
       const g = this.game;
       const pos = ghost ? this.tilePosW(u) : this.unitWorldPos(u, now);
       const tile = g.tile(u.x, u.y);
-      const naval = tile && TER[tile.terrain].water;
+      const ship = !!PP.UNITS[u.type].naval;
+      const naval = ship || (tile && TER[tile.terrain].water && tile.landmark !== 'vau');
       const p = g.players[u.owner];
       let scale = 1;
       for (const s of this.pops) if (s.kind === 'spawn' && s.unit === u) scale = PP.clamp((now - s.t0) / s.dur, 0.2, 1);
       const used = !ghost && u.owner === this.viewer && g.current === this.viewer && u.mp <= 0 && !u.canAttack;
-      const iconKey = naval ? ['n_boat', 'n_boat', 'n_ship', 'n_battleship'][Math.max(1, g.navalLevel(p))] : 'u_' + u.type;
+      const iconKey = ship ? 'u_' + u.type : naval ? ['n_raft', 'n_raft', 'n_ship', 'n_battleship'][Math.max(1, g.navalLevel(p))] : 'u_' + u.type;
+      const hidden = !ghost && g.isStealthed && g.isStealthed(u);
       ctx.save();
-      ctx.globalAlpha = alpha == null ? 1 : alpha;
+      ctx.globalAlpha = (alpha == null ? 1 : alpha) * (hidden ? 0.62 : 1);
       const x = pos.x, y = pos.y - 22;
       ctx.fillStyle = 'rgba(8,6,5,0.45)';
       ctx.beginPath(); ctx.ellipse(x + 2, pos.y + 1, 15 * scale, 5.5 * scale, 0, 0, Math.PI * 2); ctx.fill();
@@ -1129,7 +1313,33 @@
         ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(x + 17, y - 17, 5.5, 0, Math.PI * 2); ctx.fill();
         drawIcon(ctx, 'ui_promote', x + 17, y - 17, 8, INK);
       }
+      if (!ghost) this.drawUnitBadges(ctx, u, x, y);
       ctx.restore();
+    }
+
+    // Carga do transporte, efeitos ativos e falta de suprimentos
+    drawUnitBadges(ctx, u, x, y) {
+      const g = this.game;
+      const badge = (bx, by, icon, fill, ring) => {
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(bx, by, 6.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = ring; ctx.lineWidth = 1.2; ctx.stroke();
+        drawIcon(ctx, icon, bx, by, 9, fill);
+      };
+      if (u.cargo && u.cargo.length) {
+        ctx.fillStyle = INK; this.roundRect(ctx, x - 26, y - 6, 12, 12, 2); ctx.fill();
+        ctx.fillStyle = GOLD; ctx.font = `700 10px ${FONT_B}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(u.cargo.length), x - 20, y + 0.5);
+      }
+      let bx = x - 17;
+      if (u.buff) {
+        for (const k of ['aim', 'charge', 'bombard', 'taunt', 'phalanx', 'bless', 'recon']) {
+          if (!u.buff[k]) continue;
+          badge(bx, y - 17, PP.ABILITIES[k].icon, '#e6c886', 'rgba(201,164,92,0.7)');
+          bx += 11;
+          if (bx > x + 6) break;
+        }
+      }
+      if (u.owner === this.viewer && g.supplyLevel && g.supplyLevel(u) > 0) badge(x - 17, y + 5, 'ui_supply', '#d45a45', 'rgba(212,90,69,0.8)');
     }
 
     roundRect(ctx, x, y, w, h, r) {
@@ -1163,6 +1373,17 @@
       ctx.fillText(roman(c.level), 0, -1);
       ctx.restore();
       if (c.capital) drawIcon(ctx, 'ui_capital', x + w / 2 - 1, y - 11, 12, GOLD, 'rgba(10,8,6,0.8)');
+      if (c.spec && PP.SPECS[c.spec]) {
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x - w / 2 - 6, y, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(201,164,92,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+        drawIcon(ctx, PP.SPECS[c.spec].icon, x - w / 2 - 6, y, 11, '#e6c886');
+      }
+      if (c.metropolis) drawIcon(ctx, 'rw_metropolis', x - w / 2 + 1, y - 12, 12, GOLD, 'rgba(10,8,6,0.8)');
+      if (c.occupied > 0 || c.unrest) {
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x + w / 2 + 7, y, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#d45a45'; ctx.lineWidth = 1.2; ctx.stroke();
+        drawIcon(ctx, c.occupied > 0 ? 'ui_occupied' : 'ui_loyalty', x + w / 2 + 7, y, 11, '#e07a62');
+      }
       ctx.fillStyle = BONE;
       ctx.font = `700 11.5px ${FONT_D}`;
       ctx.fillText(name, x + 9, y + 0.5);

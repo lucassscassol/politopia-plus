@@ -24,15 +24,20 @@
   }
   const tribeIcon = id => 'tr_' + id;
   const unitIcon = (g, u) => {
+    if (UN[u.type].naval) return 'u_' + u.type;
     const t = g.tileAt(u);
-    if (TER[t.terrain].water) return ['n_boat', 'n_boat', 'n_ship', 'n_battleship'][Math.max(1, g.navalLevel(g.players[u.owner]))];
+    if (TER[t.terrain].water && t.landmark !== 'vau') return ['n_raft', 'n_raft', 'n_ship', 'n_battleship'][Math.max(1, g.navalLevel(g.players[u.owner]))];
     return 'u_' + u.type;
   };
-  const ACTION_ICON = { harvest: 'a_harvest', hunt: 'a_hunt', fishing: 'a_fishing', whaling: 'a_whaling', road: 'a_road', clear: 'a_clear', burn: 'a_burn', plant: 'a_plant', drain: 'a_drain' };
+  const ACTION_ICON = { harvest: 'a_harvest', hunt: 'a_hunt', fishing: 'a_fishing', whaling: 'a_whaling', road: 'a_road', clear: 'a_clear', burn: 'a_burn', plant: 'a_plant', drain: 'a_drain',
+    whalestation: 'a_whaling', terrace: 'a_terrace', tower: 'f_tower', outpost: 'f_outpost', fort: 'f_fort', fortress: 'f_fortress', repair: 'a_repair' };
+  const IMP_ICON = { whalestation: 'a_whaling', terrace: 'a_terrace' };
   const actionIcon = a => ACTION_ICON[a.id] || 'i_' + a.imp;
-  const rewardIcon = r => r === 'walls' ? 'b_walls' : r === 'giant' ? 'u_giant' : 'rw_' + r;
+  const impIcon = imp => IMP_ICON[imp] || 'i_' + imp;
+  const rewardIcon = r => r === 'walls' ? 'b_walls' : r === 'giant' ? 'u_giant' : /^m_/.test(r) ? 'rw_milestone' : 'rw_' + r;
   PP.ico = ico;
   PP.crest = crest;
+  PP.uiHelpers = { esc, fmt, SCI, tribeIcon, unitIcon, crest, ico, store, load, sleep };
 
   class UI {
     constructor() {
@@ -128,6 +133,7 @@
         else if (k === 't') this.openTech();
         else if (k === 'd') this.openDiplomacy();
         else if (k === 'c') this.openCities();
+        else if (k === 'o') this.openObjectives();
         else if (k === '+' || k === '=') this.r.zoomAt(1.2, this.r.w / 2, this.r.h / 2);
         else if (k === '-') this.r.zoomAt(1 / 1.2, this.r.w / 2, this.r.h / 2);
       });
@@ -141,10 +147,13 @@
       $('#btn-stats').onclick = () => this.openStats();
       $('#btn-log').onclick = () => this.openLog();
       $('#btn-cities').onclick = () => this.openCities();
+      $('#btn-goals').onclick = () => this.openObjectives();
+      $('#tb-event').onclick = () => this.openObjectives();
       $('#btn-menu').onclick = () => this.openGameMenu();
       $('#btn-skip').onclick = () => { this.fastForward = true; $('#btn-skip').disabled = true; };
       $('#m-new').onclick = () => this.showSetup();
       $('#m-help').onclick = () => this.openHelp();
+      $('#m-ach').onclick = () => this.openAchievements();
       $('#m-continue').onclick = () => this.continueSaved();
       $('#panel').addEventListener('click', e => {
         const b = e.target.closest('[data-a]');
@@ -214,7 +223,11 @@
       new PP.RNG((Math.random() * 1e9) | 0).shuffle(others);
       this.setupState = {
         slots: [{ tribe: prefTribe, human: true }].concat(others.slice(0, 3).map(t => ({ tribe: t, human: false }))),
-        size: saved.lastSize || 18, mapType: saved.lastMap || 'continentes', difficulty: saved.lastDiff || 'normal', victory: saved.lastVictory || 'dominacao',
+        size: saved.lastSize || 18, mapType: saved.lastMap && PP.MAP_TYPES[saved.lastMap] && !PP.MAP_TYPES[saved.lastMap].hidden ? saved.lastMap : 'continentes',
+        difficulty: saved.lastDiff || 'normal', victory: saved.lastVictory || 'dominacao',
+        scenario: saved.lastScenario && PP.SCENARIOS[saved.lastScenario] ? saved.lastScenario : 'normal',
+        victories: Object.assign({ ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true }, saved.lastVictories || {}),
+        events: saved.lastEvents !== false,
       };
       this.renderSetup();
     }
@@ -246,10 +259,11 @@
             ${s.slots.length < 6 ? '<p><button type="button" class="chip-btn" data-s="add">+ Adicionar tribo</button></p>' : ''}</div>
           <div class="row2">
             <div class="field"><span class="lbl">Tamanho do mapa</span>${seg('size', Object.entries(PP.MAP_SIZES).map(([k, v]) => [k, v.split(' ')[0]]))}</div>
-            <div class="field"><span class="lbl">Tipo de mapa</span>${seg('mapType', Object.entries(PP.MAP_TYPES).map(([k, v]) => [k, v.name]))}</div>
+            <div class="field"><span class="lbl">Tipo de mapa${PP.SCENARIOS[s.scenario].configure && /mapType/.test(String(PP.SCENARIOS[s.scenario].configure)) ? ' · definido pelo cenário' : ''}</span>${seg('mapType', Object.entries(PP.MAP_TYPES).filter(([k, v]) => !v.hidden).map(([k, v]) => [k, v.name]))}</div>
             <div class="field"><span class="lbl">Dificuldade da IA</span>${seg('difficulty', Object.entries(PP.DIFFICULTY).map(([k, v]) => [k, v.name]))}</div>
             <div class="field"><span class="lbl">Vitória</span>${seg('victory', [['dominacao', 'Dominação'], ['pontos30', 'Pontos · 30 turnos'], ['pontos50', 'Pontos · 50 turnos']])}</div>
           </div>
+          ${this.setupExtras(s)}
         </div>
         <div class="setup-f"><button type="button" class="btn ghost" data-s="back">Voltar</button><button type="submit" class="btn primary">Começar</button></div>`;
       f.onclick = e => {
@@ -261,6 +275,9 @@
         else if (a === 'del') s.slots.splice(+b.dataset.i, 1);
         else if (a === 'add') { const free = PP.TRIBE_IDS.find(t => !s.slots.some(x => x.tribe === t)); if (free) s.slots.push({ tribe: free, human: false }); }
         else if (a === 'set') s[b.dataset.k] = b.dataset.k === 'size' ? +b.dataset.v : b.dataset.v;
+        else if (a === 'vic') s.victories[b.dataset.k] = !s.victories[b.dataset.k];
+        else if (a === 'events') s.events = !s.events;
+        else if (a === 'scenario') s.scenario = b.dataset.v;
         else if (a === 'back') { f.hidden = true; $('#menu-main').hidden = false; return; }
         if (s.slots.length < 2) s.slots.push({ tribe: PP.TRIBE_IDS.find(t => !s.slots.some(x => x.tribe === t)), human: false });
         this.renderSetup();
@@ -280,10 +297,14 @@
       const s = this.setupState;
       const victory = s.victory.startsWith('pontos') ? 'pontos' : 'dominacao';
       const turnLimit = s.victory === 'pontos50' ? 50 : 30;
-      Object.assign(this.settings, { lastTribe: s.slots[0].tribe, lastSize: s.size, lastMap: s.mapType, lastDiff: s.difficulty, lastVictory: s.victory });
+      const players = s.slots.map(x => ({ tribe: x.tribe, human: x.human || x === s.slots[0] }));
+      const chk = PP.scenarioCheck(s.scenario, players);
+      if (!chk.ok) { this.toast(`${PP.SCENARIOS[s.scenario].name}: ${chk.reason}.`, 'bad'); return; }
+      Object.assign(this.settings, { lastTribe: s.slots[0].tribe, lastSize: s.size, lastMap: s.mapType, lastDiff: s.difficulty, lastVictory: s.victory,
+        lastScenario: s.scenario, lastVictories: s.victories, lastEvents: s.events });
       this.applySettings();
-      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit,
-        players: s.slots.map(x => ({ tribe: x.tribe, human: x.human || x === s.slots[0] })) });
+      const victories = Object.assign({ dominacao: true, pontos: victory === 'pontos' }, s.victories);
+      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit, victories, events: s.events, scenario: s.scenario, players });
       this.attach(g, true);
     }
 
@@ -342,13 +363,17 @@
         this.toast(`Turno ${g.turn} · +${inc.stars}★ · +${inc.sci}${SCI}`, 'gold');
       }
       if (fresh && !this.settings.seenHelp) { this.settings.seenHelp = true; this.applySettings(); this.openQuickStart(); }
+      if (fresh && g.opts.scenario && g.opts.scenario !== 'normal') this.toast(`Cenário: ${PP.SCENARIOS[g.opts.scenario].name}`, 'gold');
+      this.announceEvents();
       await this.showProposals();
+      if (p.pendingRuin) this.openRuinChoice();
       this.checkRewards();
     }
 
     async endTurn() {
       if (!this.myTurn()) return;
       if (this.me().pendingRewards.length) { this.checkRewards(); return; }
+      if (this.me().pendingRuin) { this.openRuinChoice(); return; }
       this.deselect();
       this.busy = true;
       this.game.endTurn();
@@ -407,14 +432,17 @@
 
     async showProposals() {
       const g = this.game, p = this.me();
-      while (p.proposals.length && !g.over) {
+      let guard = 0;
+      while (p.proposals.length && !g.over && guard++ < 20) {
         const pr = p.proposals[0];
         const from = g.players[pr.from];
-        const ok = await this.ask('Proposta de paz',
-          `<div class="ask-head">${crest(from.color, tribeIcon(from.tribe), 'crest-l')}<p><b>${esc(from.name)}</b> propõe um tratado de paz. Em paz, nenhum dos dois pode atacar o outro nem entrar nas cidades do outro. Quebrar um tratado mancha sua reputação com todas as tribos.</p></div>`,
-          'Aceitar a paz', 'Recusar');
-        g.respondProposal(p, pr.from, ok);
-        this.toast(ok ? `Paz assinada com ${from.name}.` : `Você recusou a paz com ${from.name}.`, ok ? 'good' : '');
+        const info = this.proposalInfo(pr);
+        const ok = await this.ask(info.title,
+          `<div class="ask-head">${crest(from.color, tribeIcon(from.tribe), 'crest-l')}<div><p>${info.body}</p>${this.opinionLine(p.id, pr.from)}</div></div>`,
+          info.yes, info.no);
+        const key = pr.id != null ? pr.id : pr.from;
+        g.respondProposal(p, key, ok);
+        this.toast(ok ? info.okText : info.noText, ok ? 'good' : '');
         this.renderHud();
       }
     }
@@ -438,7 +466,19 @@
         case 'diplomacy':
           if (d.a === v || d.b === v) {
             const o = g.players[d.a === v ? d.b : d.a];
-            this.toast(d.type === 'peace' ? `Paz com ${o.name}.` : (d.a === v ? `Você declarou guerra a ${o.name}.` : `${o.name} declarou guerra a você!`), d.type === 'peace' ? 'good' : 'bad');
+            const msg = {
+              peace: [`Paz com ${o.name}.`, 'good'], nap: [`Pacto de não agressão com ${o.name}.`, 'good'], alliance: [`Aliança com ${o.name}!`, 'gold'],
+              left: [d.a === v ? `Você encerrou a aliança com ${o.name}.` : `${o.name} encerrou a aliança com você.`, 'bad'],
+              trade: [`Acordo comercial com ${o.name}.`, 'good'], tribute: [d.a === v ? `Você pagou ${d.amount}★ de tributo a ${o.name}.` : `${o.name} pagou ${d.amount}★ de tributo.`, d.a === v ? '' : 'gold'],
+              nap_end: [`O pacto com ${o.name} terminou e foi cumprido.`, 'good'],
+              rejected: [d.b === v ? `${o.name} recusou: ${(PP.PROPOSAL_TYPES[d.what] || '').toLowerCase()}.` : '', 'bad'],
+              tribute_refused: [d.b === v ? `${o.name} se recusou a pagar tributo.` : '', 'bad'],
+            }[d.type];
+            if (d.type === 'war') {
+              const verb = d.kind === 'betrayed_ally' ? 'traiu a aliança e declarou guerra' : d.kind === 'broke_treaty' ? 'rompeu o pacto e declarou guerra' : 'declarou guerra';
+              const tag = d.kind === 'betrayed_ally' ? ' (aliança traída)' : d.kind === 'broke_treaty' ? ' (pacto rompido)' : '';
+              this.toast(d.a === v ? `Você declarou guerra a ${o.name}${tag}.` : `${o.name} ${verb} a você!`, 'bad');
+            } else if (msg && msg[0]) this.toast(msg[0], msg[1]);
           }
           break;
         case 'proposal':
@@ -461,6 +501,8 @@
         case 'veteran':
           if (d.unit.owner === v) this.toast(`${UN[d.unit.type].name} virou ${g.rank(d.unit) === 2 ? 'Elite' : 'Veterano'}. Escolha uma promoção.`, 'gold');
           break;
+        default:
+          if (this.onGameEventExt) this.onGameEventExt(type, d);
       }
     }
 
@@ -483,11 +525,13 @@
       const idle = my && g.unitsOf(p.id).every(u => !this.unitCanAct(u));
       $('#btn-end').classList.toggle('pulse', idle);
       $('#diplo-dot').hidden = !p.proposals.length;
+      this.renderEventChip();
     }
 
     unitCanAct(u) {
       const g = this.game;
       if (u.fortified && !g.attackTargets(u).length) return false;
+      if (u.cargo && u.cargo.some(x => g.unloadTargets(u, x).length)) return true;
       return (u.mp > 0 && g.reachable(u).size > 0) || g.attackTargets(u).length > 0 || g.canCapture(u);
     }
 
@@ -505,7 +549,7 @@
     visibleUnitAt(t) {
       const u = this.game.unitAt(t.x, t.y);
       if (!u) return null;
-      if (u.owner === this.viewer || this.r.visibleTo(t.x, t.y)) return u;
+      if (u.owner === this.viewer || this.r.unitShown(u)) return u;
       return null;
     }
 
@@ -513,6 +557,13 @@
       const g = this.game;
       if (!g || this.modals.length) return;
       const s = this.sel;
+      if (this.myTurn() && s && s.unload) {
+        const tr = g.units.find(x => x.id === s.unload.transport);
+        if (tr && s.unload.tiles.some(n => n === t)) {
+          if (g.unload(tr, s.unload.unit, t.x, t.y)) { this.sel = { tile: t, mode: 'unit' }; this.afterAction(); return; }
+        }
+        s.unload = null;
+      }
       if (this.myTurn() && s && s.mode === 'unit') {
         const u = this.visibleUnitAt(s.tile);
         if (u && u.owner === this.viewer) {
@@ -552,10 +603,14 @@
       if (s.mode === 'unit') {
         const u = this.visibleUnitAt(s.tile);
         if (u.owner === this.viewer && this.myTurn()) {
-          s.reach = g.reachable(u);
-          r.hl.reach = new Set(s.reach.keys());
-          r.hl.attack = g.attackTargets(u);
-          r.hl.convert = g.convertTargets(u);
+          if (s.unload) {
+            r.hl.reach = new Set(s.unload.tiles.map(t => t.y * g.W + t.x));
+          } else {
+            s.reach = g.reachable(u);
+            r.hl.reach = new Set(s.reach.keys());
+            r.hl.attack = g.attackTargets(u);
+            r.hl.convert = g.convertTargets(u);
+          }
         }
       }
       r.dirty = true;
@@ -666,7 +721,7 @@
       const rank = g.rank(u);
       const rankTag = rank === 2 ? '<span class="tag gold">Elite</span>' : rank === 1 ? '<span class="tag gold">Veterano</span>' : '';
       const title = `${st.name} ${rankTag}`;
-      const sub = `${esc(owner.name)}${st.naval ? ' · ' + UN[u.type].name + ' embarcado' : ''} · ${TER[g.tileAt(u).terrain].name}`;
+      const sub = `${esc(owner.name)}${st.naval && !UN[u.type].naval ? ' · ' + UN[u.type].name + ' embarcado' : ''}${u.cargo ? ` · ${u.cargo.length}/${UN[u.type].cargo} a bordo` : ''} · ${TER[g.tileAt(u).terrain].name}`;
       const bonus = g.defenseBonus(u);
       let html = this.head(crest(owner.color, unitIcon(g, u), 'crest-l'), title, sub, owner.color);
       const next = PP.XP_LEVELS.find(x => x > u.xp);
@@ -680,6 +735,7 @@
       const promos = u.promos.map(k => PP.PROMOTIONS[k].name);
       if (skills.length || promos.length) html += `<p class="note">${skills.join(' · ')}${promos.length ? `<br>Promoções: ${promos.join(', ')}` : ''}</p>`;
       if (UN[u.type].mounted && !st.naval) html += '<p class="note">Montado: não entra em montanhas; Piqueiros são fortes contra ele.</p>';
+      html += this.unitStatus(u);
 
       if (u.owner === this.viewer && this.myTurn()) {
         const acts = [];
@@ -691,10 +747,17 @@
         if (g.canHealOthers(u)) acts.push(this.act('healOthers', 'ui_heal', 'Curar aliados', null));
         if (g.canRecover(u)) acts.push(this.act('recover', 'ui_recover', 'Recuperar', null, { title: 'Cura e encerra o turno da unidade' }));
         if (g.canFortify(u)) acts.push(this.act('fortify', 'ui_fortify', 'Fortificar', null, { title: '+25% de defesa até mover' }));
+        for (const id of g.abilitiesOf(u)) {
+          const ab = PP.ABILITIES[id], chk = g.abilityCheck(u, id);
+          acts.push(this.act('ability', ab.icon, ab.name, `${ab.cd}t`, { off: !chk.ok, reason: chk.ok ? '' : chk.reason, data: { id }, title: ab.desc, hot: chk.ok && !!ab.before && !u.moved }));
+        }
+        const pc = g.pillageCheck(u);
+        if (pc.visible) acts.push(this.act('pillage', 'a_pillage', { fort: 'Destruir fortificação', imp: 'Saquear melhoria', road: 'Cortar estrada' }[pc.what], null, { off: !pc.ok, reason: pc.ok ? '' : pc.reason, title: 'Rende estrelas e corta a produção ou as rotas do inimigo' }));
         const t = g.tileAt(u);
         if (t.city || t.owner === this.viewer) acts.push(this.act('tileview', 'ui_view', t.city ? 'Ver cidade' : 'Ver casa', null));
         acts.push(this.act('disband', 'ui_disband', this.confirmDisband === u.id ? 'Confirmar' : 'Dissolver', null, { confirm: this.confirmDisband === u.id }));
         html += `<div class="sec-lbl">Ordens</div><div class="acts">${acts.join('')}</div>`;
+        html += this.unitExtraSections(u);
         const targets = g.attackTargets(u);
         const conv = g.convertTargets(u);
         if (targets.length || conv.length) {
@@ -704,7 +767,7 @@
             const ds = g.stat(d);
             html += `<button type="button" class="target" data-a="attack" data-id="${d.id}">${crest(g.players[d.owner].color, unitIcon(g, d), 'crest-s')}
               <span class="tn">${ds.name} · ${esc(g.players[d.owner].name)} <small>(${d.hp} de vida)</small></span>
-              <span class="tp">causa <span class="dmg">${r.dmg}</span>${r.kill ? ' · abate' : ''} · recebe <span class="ret">${r.ret}</span>${r.retKill ? ' · morre' : ''}</span></button>`;
+              <span class="tp">causa <span class="dmg">${r.dmg}</span>${r.kill ? ' · abate' : ''} · recebe <span class="ret">${r.ret}</span>${r.retKill ? ' · morre' : ''}${r.notes && r.notes.length ? `<br><small>${esc(r.notes.join(' · '))}</small>` : ''}</span></button>`;
           }
           for (const d of conv) html += `<button type="button" class="target" data-a="convert" data-id="${d.id}">${crest(g.players[d.owner].color, unitIcon(g, d), 'crest-s')}<span class="tn">Converter ${g.stat(d).name}</span><span class="tp">passa para o seu lado</span></button>`;
           html += '</div>';
@@ -712,8 +775,7 @@
         if (u.mp > 0 && this.sel && this.sel.reach && this.sel.reach.size) html += '<p class="note">Toque numa casa marcada para mover.</p>';
         else if (!targets.length && !g.canCapture(u) && u.mp <= 0) html += '<p class="note">Esta unidade já agiu neste turno.</p>';
       } else if (u.owner !== this.viewer) {
-        const rel = g.atWar(this.viewer, u.owner) ? '<span class="tag bad">Em guerra</span>' : '<span class="tag good">Em paz</span>';
-        html += `<p class="note">${rel}</p>`;
+        html += `<p class="note">${this.relTag(u.owner)}</p>`;
       }
       return html;
     }
@@ -727,28 +789,31 @@
         const c = g.cityMap[t.city];
         const co = g.players[c.owner];
         const mine = c.owner === this.viewer;
-        html += this.head(crest(co.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l'), `${esc(c.name)} <span class="tag">Nível ${PP.roman(c.level)}</span>`, `${esc(co.name)}${c.capital ? ' · Capital' : ''} · ${ter.name}`, co.color);
+        html += this.head(crest(co.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l'), `${esc(c.name)} <span class="tag">Nível ${PP.roman(c.level)}</span>${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${c.metropolis ? ' <span class="tag gold">Metrópole</span>' : ''}`, `${esc(co.name)}${c.capital ? ' · Capital' : ''} · ${ter.name}`, co.color);
+        const status = g.cityStatus(c);
+        if (status) html += `<p class="note"><span class="tag ${status.tag}">${status.name}</span>${mine ? ` Lealdade ${c.loyalty}/100.` : ''}</p>`;
         const need = c.level + 1;
         html += `<div class="popbar" aria-label="População">${Array.from({ length: need }, (_, k) => `<i class="${k < c.pop ? 'on' : ''}"></i>`).join('')}</div>`;
         if (mine) {
           const inc = g.cityIncome(c);
           html += `<div class="stats"><span class="st gold">★ +${inc.stars}</span><span class="st sci">${SCI} +${inc.sci}</span>
             ${this.stat('s_pop', `${c.pop}/${need} p/ nível ${PP.roman(c.level + 1)}`)}${this.stat('s_atk', `${g.cityUnits(c).length}/${g.capacity(c)} unidades`)}
-            ${c.buildings.walls ? this.stat('b_walls', 'Muralhas') : ''}${c.connected ? this.stat('a_road', 'Conectada') : ''}</div>`;
+            ${c.buildings.walls ? this.stat('b_walls', 'Muralhas') : ''}${c.connected ? this.stat('a_road', 'Conectada') : ''}
+            ${this.stat('ui_loyalty', `Lealdade ${c.loyalty}`)}${g.routeSlots(c) ? this.stat('d_trade', `Rotas ${g.routesOf(c).length}/${g.routeSlots(c)}`) : ''}</div>`;
           if (this.myTurn()) {
             const acts = [];
             for (const type of PP.TRAINABLE) {
               const d = UN[type];
               const chk = g.trainCheck(p, c, type);
               if (chk.locked) continue;
-              acts.push(this.act('train', 'u_' + type, d.name, d.cost + '★', { off: !chk.ok, reason: chk.ok ? '' : chk.reason, data: { type, city: c.id } }));
+              acts.push(this.act('train', 'u_' + type, d.name, chk.cost + '★', { off: !chk.ok, reason: chk.ok ? '' : chk.reason, data: { type, city: c.id } }));
             }
             html += `<div class="sec-lbl">Recrutar</div><div class="acts">${acts.join('')}</div>`;
             html += `<div class="acts" style="margin-top:4px">${this.act('city', 'ui_city', 'Governar cidade', null, { data: { city: c.id } })}</div>`;
           }
         } else {
-          const rel = g.atWar(this.viewer, c.owner) ? '<span class="tag bad">Em guerra</span>' : '<span class="tag good">Em paz</span>';
-          html += `<p class="note">${rel} ${c.buildings.walls ? '· Muralhas (defesa ×3)' : '· defesa ×1,5 na cidade'}. Para conquistar, termine o turno com uma unidade sobre a cidade e use <b>Conquistar</b> no turno seguinte.</p>`;
+          const rel = this.relTag(c.owner);
+          html += `<p class="note">${rel} ${c.buildings.walls ? '· Muralhas (defesa ×3)' : '· defesa ×1,5 na cidade'}. Para conquistar, termine o turno com uma unidade sobre a cidade e use <b>Conquistar</b> no turno seguinte. Cidades conquistadas ficam ocupadas por ${PP.OCCUPATION_TURNS} turnos antes de se integrar (ou resistir).</p>`;
         }
         return html;
       }
@@ -761,20 +826,29 @@
       if (t.res) parts.push(PP.RESOURCES[t.res].name);
       if (t.imp) parts.push(PP.IMPROVEMENTS[t.imp].name);
       if (t.road) parts.push('Estrada');
-      const iconKey = t.wonder ? 'w_' + t.wonder : t.imp ? 'i_' + t.imp : t.res ? 'r_' + t.res : t.ruin ? 'ui_ruins' : 'g_' + t.terrain;
-      const title = t.wonder ? PP.WONDERS[t.wonder].name : t.ruin ? 'Ruínas' : parts[parts.length > 1 ? 1 : 0];
+      if (t.fort) parts.push(PP.FORTS[t.fort.type].name);
+      if (t.landmark) parts.push(PP.LANDMARKS[t.landmark].name);
+      const ruinDef = t.ruin && t.ruinType ? PP.RUIN_TYPES[t.ruinType] : null;
+      const iconKey = t.wonder ? 'w_' + t.wonder : t.fort ? PP.FORTS[t.fort.type].icon : t.imp ? impIcon(t.imp) : t.res ? 'r_' + t.res : t.ruin ? 'ui_ruins' : t.landmark ? PP.LANDMARKS[t.landmark].icon : 'g_' + t.terrain;
+      const title = t.wonder ? PP.WONDERS[t.wonder].name : ruinDef ? ruinDef.name : t.ruin ? 'Ruínas' : t.fort ? PP.FORTS[t.fort.type].name : t.landmark && !t.imp && !t.res ? PP.LANDMARKS[t.landmark].name : parts[parts.length > 1 ? 1 : 0];
       const sub = (owner ? `Território de ${esc(owner.name)}` : 'Sem dono') + ' · ' + parts.join(' · ');
       html += this.head(ico(iconKey), title, sub, null);
       const info = [];
       if (ter.info) info.push(ter.info + '.');
       if (t.res && PP.RESOURCES[t.res].info) info.push(PP.RESOURCES[t.res].info + '.');
-      if (t.ruin) info.push('Mova uma unidade até aqui para explorar e ganhar uma recompensa.');
+      if (ruinDef) info.push(ruinDef.text + ' Leve uma unidade até aqui para decidir: explorar, saquear' + (ruinDef.restore ? ', restaurar' : '') + (ruinDef.honor ? ', honrar' : '') + '.');
+      else if (t.ruin) info.push('Mova uma unidade até aqui para explorar e ganhar uma recompensa.');
+      if (t.landmark) info.push(`<b>${PP.LANDMARKS[t.landmark].name}:</b> ${PP.LANDMARKS[t.landmark].desc}.`);
+      if (t.fort) info.push(`<b>${PP.FORTS[t.fort.type].name}</b> de ${esc(g.players[t.fort.owner].name)}: ${PP.FORTS[t.fort.type].desc}. Inimigos que entram aqui tomam a fortificação.`);
+      if (t.pillaged) info.push('<b>Saqueada:</b> não produz nem fornece recursos até ser reparada.');
+      if (t.shrine != null && t.shrine >= 0) info.push(`Santuário restaurado por ${esc(g.players[t.shrine].name)}: +1${SCI} por turno.`);
+      if (t.imp === 'whalestation') info.push('Rende +1★ por turno e conta como luxo (Baleias).');
       if (t.wonder) info.push(PP.WONDERS[t.wonder].desc + '.');
       if (t.imp === 'market') info.push(`Rende +${g.marketValue(t)}★ por turno (soma das serrarias, moinhos e forjas vizinhas).`);
-      if (t.imp === 'gemmine' || t.imp === 'plantation') info.push('Rende +2★ por turno.');
+      if (t.imp === 'gemmine' || t.imp === 'plantation') info.push('Rende +2★ por turno e conta como luxo.');
       if (t.imp === 'mine') info.push('Fornece Ferro (Espadachim, Mosqueteiro, Canhão).');
       if (t.imp === 'pasture') info.push('Fornece Cavalos (Cavaleiro).');
-      if (info.length) html += `<p class="note">${info.join(' ')}</p>`;
+      if (info.length) html += `<p class="note">${info.map(x => /<b>/.test(x) ? x : esc(x)).join(' ')}</p>`;
       if (this.myTurn()) {
         const acts = g.tileActions(p, t).filter(a => !(a.def.road && a.locked)).map(a => this.act('tile', actionIcon(a.def), a.def.name, a.cost + '★', {
           off: !a.ok && !a.locked, locked: a.locked, reason: a.ok ? '' : a.reason, data: { id: a.id }, title: this.actionHint(a.def),
@@ -793,7 +867,9 @@
       if (a.adj) bits.push(`+${a.per} população por ${PP.IMPROVEMENTS[a.adj].name} vizinha`);
       if (a.gold) bits.push(`+${a.gold}★`);
       if (a.income) bits.push(`+${a.income}★ por turno`);
-      if (a.road) bits.push('Movimento dobrado; conecta cidades');
+      if (a.road) bits.push('Movimento dobrado; conecta cidades e rotas comerciais');
+      if (a.fort) bits.push(PP.FORTS[a.fort].desc);
+      if (a.repair) bits.push('A melhoria volta a produzir');
       return bits.join(' · ');
     }
 
@@ -826,6 +902,28 @@
           break;
         }
         case 'city': this.openCity(g.cityMap[+d.city]); break;
+        case 'ability': if (u && g.useAbility(u, d.id)) this.afterAction(); else if (u) this.toast(g.abilityCheck(u, d.id).reason || 'Indisponível', 'bad'); break;
+        case 'pillage': if (u && g.pillage(u)) this.afterAction(); break;
+        case 'spy': {
+          if (!u) break;
+          const res = g.spyMission(u, d.id);
+          if (!res) { this.toast('Missão indisponível.', 'bad'); break; }
+          this.toast(res.caught ? 'O espião foi capturado!' : res.text, res.caught ? 'bad' : 'good');
+          if (res.caught) this.deselect();
+          this.afterAction();
+          if (!res.caught && d.id === 'infiltrate') this.openIntel(res.victim);
+          break;
+        }
+        case 'unloadSel': {
+          if (!u) break;
+          const x = (u.cargo || []).find(c => c.id === +d.id);
+          const tiles = x ? g.unloadTargets(u, x) : [];
+          if (!tiles.length) { this.toast('Nenhuma praia livre ao lado (ou a tropa embarcou neste turno).', 'bad'); break; }
+          this.sel.unload = { transport: u.id, unit: x.id, tiles };
+          this.refreshSelection();
+          this.toast('Toque numa casa marcada para desembarcar.', '');
+          break;
+        }
         case 'tile': {
           const chk = g.tileActionCheck(p, this.sel.tile, d.id);
           if (!chk.ok) { this.toast(chk.reason || 'Indisponível', 'bad'); break; }
@@ -964,14 +1062,19 @@
         }
         case 'war': {
           const o = g.players[+d.p];
-          this.ask('Declarar guerra?', `<p>Quebrar a paz com <b>${esc(o.name)}</b> reduz sua reputação: as outras tribos vão confiar menos em você nas negociações.</p>`, 'Declarar guerra', 'Manter a paz').then(ok => {
+          const st = g.relState(this.viewer, +d.p);
+          const warn = st === 'alliance' ? 'Trair uma aliança custa <b>3 de reputação</b>, a vítima nunca esquece e todas as tribos que conhecem você passam a desconfiar.'
+            : st === 'nap' ? 'Romper um pacto de não agressão custa <b>2 de reputação</b> e todas as tribos que conhecem você passam a desconfiar.'
+            : 'Quebrar a paz custa 1 de reputação: as outras tribos vão confiar menos em você nas negociações.';
+          const allies = g.alliesOf(+d.p).map(a => g.players[a].name);
+          this.ask('Declarar guerra?', `<p>${warn}${allies.length ? ` Os aliados de ${esc(o.name)} (${esc(allies.join(', '))}) serão chamados às armas.` : ''}</p>`, 'Declarar guerra', 'Manter a paz').then(ok => {
             if (ok && g.declareWar(this.viewer, +d.p)) this.afterAction();
             this.openDiplomacy(true);
           });
           break;
         }
         case 'respond': {
-          g.respondProposal(this.me(), +d.p, d.v === '1');
+          g.respondProposal(this.me(), d.id ? +d.id : +d.p, d.v === '1');
           this.afterAction();
           this.openDiplomacy(true);
           break;
@@ -993,6 +1096,8 @@
         case 'viewmap':
           this.closeModal('gameover'); this.r.viewer = -1; this.r.dirty = true;
           break;
+        default:
+          if (this.modalActionExt) this.modalActionExt(a, d, btn);
       }
     }
 
@@ -1012,10 +1117,11 @@
       const units = PP.TRAINABLE.map(type => {
         const d = UN[type];
         const chk = g.trainCheck(p, c, type);
+        if (chk.locked && (d.naval || d.spy)) return '';
         const needs = d.needs ? ` · requer ${PP.STRATEGIC[d.needs].name}` : '';
         return `<button type="button" class="card ${chk.ok && my ? 'go' : ''} ${chk.locked ? 'locked' : ''}" data-m="train" data-city="${c.id}" data-v="${type}">
           <div class="card-row">${crest(p.color, 'u_' + type, 'crest-s')}<span class="cn">${d.name}</span></div>
-          <span class="cc star">${d.cost}★</span>
+          <span class="cc star">${chk.cost}★${chk.cost !== d.cost ? ` <small class="muted">(${d.cost})</small>` : ''}</span>
           <span class="mini-stats"><span>${ico('s_hp')}${d.hp}</span><span>${ico('s_atk')}${fmt(d.atk)}</span><span>${ico('s_def')}${d.def}</span><span>${ico('s_move')}${d.move}</span><span>${ico('s_range')}${d.range}</span></span>
           <span class="cd">${d.skills.map(k => (PP.SKILL_NAMES[k] || '').split(' (')[0]).join(', ')}${needs}</span>
           ${chk.ok ? '' : `<span class="cr">${esc(chk.reason)}</span>`}</button>`;
@@ -1023,8 +1129,9 @@
       const blds = PP.BUILDING_ORDER.map(id => {
         const b = PP.BUILDINGS[id];
         const chk = g.buildingCheck(p, c, id);
+        if (b.spec && b.spec !== c.spec && !c.buildings[id]) return '';
         return `<button type="button" class="card ${chk.ok && my ? 'go' : ''} ${chk.done ? 'done' : ''} ${chk.locked ? 'locked' : ''}" data-m="build" data-city="${c.id}" data-v="${id}">
-          <div class="card-row">${ico('b_' + id, 'ci')}<span class="cn">${b.name}</span></div>
+          <div class="card-row">${ico('b_' + id, 'ci')}<span class="cn">${b.name}</span>${b.spec ? `<span class="tag gold">${PP.SPECS[b.spec].name}</span>` : ''}</div>
           <span class="cc star">${chk.done ? 'Construído' : chk.cost + '★'}</span><span class="cd">${b.desc}</span>
           ${!chk.ok && !chk.done ? `<span class="cr">${esc(chk.reason)}</span>` : ''}</button>`;
       }).join('');
@@ -1034,15 +1141,20 @@
       if (c.parks) bonus.push(`Parque ×${c.parks}`);
       if (c.radius > 1) bonus.push('Fronteiras expandidas');
       if (c.connected) bonus.push('Conectada à capital');
+      if (c.metropolis) bonus.push('Metrópole');
+      for (const m in c.milestones || {}) if (PP.REWARDS[m]) bonus.push(PP.REWARDS[m].name);
       const need = c.level + 1;
-      const html = `<div class="modal-h">${crest(p.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l')}<div class="mh-t"><h2>${esc(c.name)}</h2><div class="sub">Nível ${PP.roman(c.level)} · ${c.pop}/${need} de população para o próximo nível</div></div>
+      const defX = (c.buildings.walls ? 3 : 1.5) + (g.wonders.great_wall === c.owner ? 0.5 : 0) + g.cityDefenseExtra(c);
+      const html = `<div class="modal-h">${crest(p.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l')}<div class="mh-t"><h2>${esc(c.name)}</h2><div class="sub">Nível ${PP.roman(c.level)}${c.spec ? ' · Cidade ' + PP.SPECS[c.spec].name.toLowerCase() : ''} · ${c.pop}/${need} de população para o próximo nível</div></div>
         ${this.closeX()}</div>
         <div class="modal-b">
           <div class="popbar">${Array.from({ length: need }, (_, k) => `<i class="${k < c.pop ? 'on' : ''}"></i>`).join('')}</div>
           <div class="stats"><span class="st gold">★ +${inc.stars} por turno</span><span class="st sci">${SCI} +${inc.sci} por turno</span>
-          ${this.stat('s_atk', `${g.cityUnits(c).length}/${g.capacity(c)} unidades`)}${this.stat('s_def', `defesa ×${fmt((c.buildings.walls ? 3 : 1.5) + (g.wonders.great_wall === c.owner ? 0.5 : 0))}`)}</div>
+          ${this.stat('s_atk', `${g.cityUnits(c).length}/${g.capacity(c)} unidades`)}${this.stat('s_def', `defesa ×${fmt(defX)}`)}${this.stat('ui_loyalty', `lealdade ${c.loyalty}`)}</div>
+          ${inc.notes && inc.notes.length ? `<p class="note">${esc(inc.notes.join(' · '))}</p>` : ''}
           ${bonus.length ? `<p class="note">${bonus.join(' · ')}</p>` : ''}
-          <div class="sec-lbl">Recrutar${g.unitAt(c.x, c.y) ? ' · a cidade precisa estar desocupada' : ''}</div><div class="grid">${units}</div>
+          ${this.citySections(c)}
+          <div class="sec-lbl">Recrutar${g.unitAt(c.x, c.y) ? ' · a cidade precisa estar desocupada (navios nascem no porto)' : ''}</div><div class="grid">${units}</div>
           <div class="sec-lbl">Construções</div><div class="grid">${blds}</div>
         </div>`;
       if (refresh) this.replaceModal('city', html); else this.openModal('city', html);
@@ -1055,7 +1167,7 @@
       const rows = list.map(c => {
         const inc = g.cityIncome(c);
         return `<div class="row">${crest(me.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-m')}
-          <div class="rt"><div class="rn">${esc(c.name)} · nível ${PP.roman(c.level)}</div><div class="rs">★ +${inc.stars} · ${SCI} +${inc.sci} · ${g.cityUnits(c).length}/${g.capacity(c)} unidades · população ${c.pop}/${c.level + 1}</div></div>
+          <div class="rt"><div class="rn">${esc(c.name)} · nível ${PP.roman(c.level)}${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${g.cityStatus(c) ? ` <span class="tag bad">${g.cityStatus(c).name}</span>` : ''}</div><div class="rs">★ +${inc.stars} · ${SCI} +${inc.sci} · ${g.cityUnits(c).length}/${g.capacity(c)} unidades · população ${c.pop}/${c.level + 1} · lealdade ${c.loyalty}${g.routeSlots(c) ? ` · rotas ${g.routesOf(c).length}/${g.routeSlots(c)}` : ''}</div></div>
           <div class="ra"><button type="button" class="chip-btn" data-m="goto" data-city="${c.id}">Ir até lá</button></div></div>`;
       }).join('');
       this.openModal('cities', `<div class="modal-h"><div><h2>Suas cidades</h2><div class="sub">${list.length} ${list.length === 1 ? 'cidade' : 'cidades'}</div></div>${this.closeX()}</div>
@@ -1099,33 +1211,57 @@
       const g = this.game, me = this.me();
       $('#diplo-dot').hidden = true;
       const myS = g.strength(me.id);
+      const my = this.myTurn();
       let rows = '';
       let unknown = 0;
       for (const o of g.players) {
         if (o.id === me.id) continue;
         if (!me.met[o.id]) { unknown++; continue; }
         const rel = me.rel[o.id];
-        const war = rel.state === 'war';
+        const st = rel.state;
         const ratio = g.strength(o.id) / Math.max(1, myS);
         const power = !o.alive ? 'eliminada' : ratio > 1.5 ? 'muito mais forte' : ratio > 1.1 ? 'mais forte' : ratio > 0.9 ? 'equilibrada' : ratio > 0.6 ? 'mais fraca' : 'muito mais fraca';
-        const rep = o.reputation < 0 ? ` · reputação ${o.reputation <= -2 ? 'traiçoeira' : 'duvidosa'}` : '';
-        const pending = me.proposals.some(pr => pr.from === o.id);
+        const rep = o.reputation < 0 ? ` · reputação ${o.reputation <= -2 ? 'traiçoeira' : 'duvidosa'} (${o.reputation})` : o.reputation > 0 ? ` · reputação boa (+${o.reputation})` : '';
+        const pend = me.proposals.filter(pr => pr.from === o.id);
+        const R = PP.RELATIONS[st] || PP.RELATIONS.war;
+        const extra = st === 'nap' && rel.until != null ? ` · pacto até o turno ${rel.until}` : st !== 'war' ? ` · ${R.name.toLowerCase()} desde o turno ${rel.since}` : '';
         let actions = '';
-        if (o.alive && this.myTurn()) {
-          if (pending) actions = `<button type="button" class="chip-btn" data-m="respond" data-p="${o.id}" data-v="1">Aceitar paz</button><button type="button" class="chip-btn" data-m="respond" data-p="${o.id}" data-v="0">Recusar</button>`;
-          else if (war) actions = `<button type="button" class="chip-btn" data-m="peace" data-p="${o.id}">${ico('ui_peace')} Propor paz</button>`;
-          else actions = `<button type="button" class="chip-btn danger" data-m="war" data-p="${o.id}">${ico('ui_war')} Declarar guerra</button>`;
+        if (o.alive && my) {
+          const btn = (m, label, icon, type, cls) => `<button type="button" class="chip-btn ${cls || ''}" data-m="${m}" data-p="${o.id}" ${type ? `data-t="${type}"` : ''}>${icon ? ico(icon) : ''} ${label}</button>`;
+          for (const pr of pend) {
+            actions += `<button type="button" class="chip-btn" data-m="respond" data-p="${o.id}" data-id="${pr.id != null ? pr.id : ''}" data-v="1">${ico('d_treaty')} Aceitar: ${esc(this.proposalInfo(pr).short)}</button><button type="button" class="chip-btn danger" data-m="respond" data-p="${o.id}" data-id="${pr.id != null ? pr.id : ''}" data-v="0">Recusar</button>`;
+          }
+          if (st === 'war') actions += btn('propose', 'Propor paz', 'ui_peace', 'peace');
+          else {
+            if (st === 'peace') actions += btn('propose', `Pacto (${PP.NAP_TURNS}t)`, 'd_nap', 'nap');
+            if (st !== 'alliance') actions += btn('propose', 'Aliança', 'd_alliance', 'alliance');
+            actions += btn('trade', 'Comércio', 'd_trade');
+            actions += btn('tribute', 'Tributo', 'd_tribute');
+            actions += btn('joint', 'Guerra conjunta', 'd_joint');
+            if (st === 'alliance') actions += btn('leave', 'Sair da aliança', 'd_break', null, 'danger');
+            actions += btn('war', st === 'alliance' ? 'Trair e atacar' : st === 'nap' ? 'Romper pacto' : 'Declarar guerra', 'ui_war', null, 'danger');
+          }
         }
+        const op = g.opinion(o.id, me.id);
+        const ol = g.opinionLabel(op);
+        const mem = g.memorySummary(o.id, me.id).slice(0, 3).map(m => `${esc(m.label)} (${m.value > 0 ? '+' : ''}${m.value})`).join(' · ');
+        const intel = me.intel && me.intel[o.id] ? me.intel[o.id] : null;
+        const others = g.players.filter(q => q.alive && q.id !== o.id && q.id !== me.id && me.met[q.id] && o.met[q.id])
+          .map(q => { const s2 = g.relState(o.id, q.id); return s2 === 'war' ? '' : `${esc(q.name)}: ${PP.RELATIONS[s2].name.toLowerCase()}`; }).filter(Boolean).join(', ');
         rows += `<div class="row">${crest(o.color, tribeIcon(o.tribe), 'crest-m')}
-          <div class="rt"><div class="rn">${esc(o.name)} ${o.alive ? (war ? '<span class="tag bad">Guerra</span>' : '<span class="tag good">Paz</span>') : '<span class="tag">Eliminada</span>'} ${pending ? '<span class="tag gold">Propõe paz</span>' : ''}</div>
-          <div class="rs">${g.score(o)} pontos · ${g.citiesOf(o.id).length} cidades · força ${power}${rep}${!war && o.alive ? ` · desde o turno ${rel.since}` : ''}</div></div>
+          <div class="rt"><div class="rn">${esc(o.name)} ${o.alive ? `<span class="tag ${R.tag}">${R.name}</span>` : '<span class="tag">Eliminada</span>'} ${o.alive ? `<span class="tag ${ol.tag}">${ol.name} (${op > 0 ? '+' : ''}${op})</span>` : ''} ${pend.length ? '<span class="tag gold">Proposta</span>' : ''}</div>
+          <div class="rs">${g.score(o)} pontos · ${g.citiesOf(o.id).length} cidades · força ${power}${rep}${extra}</div>
+          ${mem ? `<div class="rs">Lembram: ${mem}</div>` : ''}
+          ${others ? `<div class="rs">Tratados: ${others}</div>` : ''}
+          ${intel ? `<div class="rs">Relatório de espionagem (T${intel.turn}): ${intel.stars}★ · ${intel.science}${SCI} · ${intel.units} unidades · ${intel.techs} tecnologias${intel.strategy && PP.AI_STRATEGIES ? ' · objetivo: ' + PP.AI_STRATEGIES[intel.strategy].name : ''} <button type="button" class="chip-btn" data-m="intel" data-p="${o.id}">Ver</button></div>` : ''}</div>
           <div class="ra">${actions}</div></div>`;
       }
       if (unknown) rows += `<div class="row"><span class="crest crest-m unknown">${ico('ui_unknown', 'crest-ico')}</span><div class="rt"><div class="rn">${unknown} tribo${unknown > 1 ? 's' : ''} ainda desconhecida${unknown > 1 ? 's' : ''}</div><div class="rs">Explore o mapa para fazer contato.</div></div></div>`;
+      const lock = g.opts.diploLockUntil && g.turn < g.opts.diploLockUntil ? ` <b>Guerra total: a paz só é possível a partir do turno ${g.opts.diploLockUntil}.</b>` : '';
       const html = `<div class="modal-h"><h2>Diplomacia</h2>${this.closeX()}</div>
-        <div class="modal-b"><p class="note">Todas as tribos começam em guerra. A IA aceita a paz com mais facilidade quando está mais fraca, quando já guerreia em outra frente ou quando você tem boa reputação.${me.reputation < 0 ? ` <b>Sua reputação está manchada (${me.reputation}).</b>` : ''}</p>
+        <div class="modal-b"><p class="note">Todas as tribos começam em guerra. Cada tribo lembra o que você fez: guerras, tratados cumpridos ou rompidos, comércio, ajuda militar e cidades tomadas. Romper um pacto ou trair uma aliança derruba sua reputação com o mundo inteiro. Aliados compartilham visão, pagam 20% menos pelas tecnologias que o outro já tem e podem chamar você para a guerra.${me.reputation < 0 ? ` <b>Sua reputação está manchada (${me.reputation}).</b>` : me.reputation > 0 ? ` Sua reputação é boa (+${me.reputation}).` : ''}${lock}</p>
         <div class="list" style="margin-top:10px">${rows}</div></div>`;
-      if (refresh) this.replaceModal('diplo', html); else this.openModal('diplo', html, { narrow: true });
+      if (refresh) this.replaceModal('diplo', html); else this.openModal('diplo', html, { narrow: false });
     }
 
     // ---------------------------------------------------------- Placar
@@ -1169,7 +1305,7 @@
     openStats() {
       if (!this.game) return;
       const g = this.game;
-      const html = `<div class="modal-h"><div><h2>Placar</h2><div class="sub">${g.opts.victory === 'pontos' ? `Vence quem tiver mais pontos no fim do turno ${g.opts.turnLimit}.` : 'Vitória por dominação: elimine todas as outras tribos.'}</div></div>
+      const html = `<div class="modal-h"><div><h2>Placar</h2><div class="sub">${g.opts.victory === 'pontos' ? `Vence quem tiver mais pontos no fim do turno ${g.opts.turnLimit}.` : 'Vitória por dominação: elimine todas as outras tribos.'}${g.opts.victories ? ' Veja as outras vitórias em Objetivos.' : ''}</div></div>
         ${this.closeX()}</div>
         <div class="modal-b"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tribo</th><th class="num">Pontos</th><th class="num">Cidades</th><th class="num">Unidades</th><th class="num">Tecn.</th><th class="num">Abates</th></tr></thead>
         <tbody>${this.scoreRows(this.r.viewer === -1)}</tbody></table></div>${this.scoreChart(this.r.viewer === -1)}
@@ -1196,10 +1332,11 @@
           <div class="field"><span class="lbl">Câmera e ambiente</span><div class="seg">
             <button type="button" class="${this.settings.follow ? 'on' : ''}" data-m="follow">Seguir ações da IA</button>
             <button type="button" class="${this.settings.ash ? 'on' : ''}" data-m="ash">Cinzas no ar</button></div></div>
-          <p class="note">Partida: mapa ${this.game.W}×${this.game.H} · ${PP.MAP_TYPES[this.game.opts.mapType].name} · IA ${PP.DIFFICULTY[this.game.opts.difficulty].name}. O jogo salva sozinho a cada turno.</p>
-          <p class="note">Atalhos: Enter encerra o turno · N próxima unidade · T tecnologia · D diplomacia · C cidades · roda do mouse ou pinça para zoom.</p>
+          <p class="note">Partida: mapa ${this.game.W}×${this.game.H} · ${(PP.MAP_TYPES[this.game.opts.mapType] || { name: this.game.opts.mapType }).name} · IA ${PP.DIFFICULTY[this.game.opts.difficulty].name}${this.game.opts.scenario && this.game.opts.scenario !== 'normal' ? ' · Cenário ' + PP.SCENARIOS[this.game.opts.scenario].name : ''}. O jogo salva sozinho a cada turno.</p>
+          <p class="note">Atalhos: Enter encerra o turno · N próxima unidade · T tecnologia · D diplomacia · C cidades · O objetivos · roda do mouse ou pinça para zoom.</p>
         </div>
-        <div class="modal-f"><button type="button" class="btn ghost" data-m="help">Como jogar</button><button type="button" class="btn ghost" data-m="quit">Sair para o menu</button><button type="button" class="btn primary" data-m="resume">Voltar ao jogo</button></div>`;
+        <div class="modal-f"><button type="button" class="btn ghost" data-m="objectives">Objetivos</button><button type="button" class="btn ghost" data-m="achievements">Conquistas</button><button type="button" class="btn ghost" data-m="replay">Replay</button>
+          <button type="button" class="btn ghost" data-m="help">Como jogar</button><button type="button" class="btn ghost" data-m="quit">Sair para o menu</button><button type="button" class="btn primary" data-m="resume">Voltar ao jogo</button></div>`;
       if (refresh) this.replaceModal('menu', html); else this.openModal('menu', html, { narrow: true });
     }
 
@@ -1210,13 +1347,17 @@
       const w = g.players[g.winner];
       const humanWon = w && w.human;
       const title = humanWon ? (this.hotseat ? `Vitória de ${w.name}` : 'Vitória') : 'Derrota';
-      const reason = { dominacao: 'por dominação', pontos: `por pontos no turno ${g.opts.turnLimit}`, derrota: 'sua tribo foi eliminada' }[g.endReason] || '';
+      const reason = { dominacao: 'por dominação', pontos: `por pontos no turno ${g.opts.turnLimit}`, derrota: 'sua tribo foi eliminada' }[g.endReason] ||
+        (PP.VICTORIES[g.endReason] ? `pela vitória ${PP.VICTORIES[g.endReason].name.toLowerCase()}` : '');
+      this.recordAchievements();
       const sub = humanWon ? `${esc(w.name)} venceu ${reason}.` : g.endReason === 'derrota' ? `Sua tribo foi eliminada. ${w ? esc(w.name) + ' lidera o mundo.' : ''}` : `${w ? esc(w.name) : 'Ninguém'} venceu ${reason}.`;
       store(SAVE_KEY, null);
       this.openModal('gameover', `<div class="modal-h">${w ? crest(w.color, tribeIcon(w.tribe), 'crest-l') : ''}<div class="mh-t"><h2>${title}</h2><div class="sub">${sub} Turno ${g.turn}.</div></div></div>
         <div class="modal-b"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tribo</th><th class="num">Pontos</th><th class="num">Cidades</th><th class="num">Unidades</th><th class="num">Tecn.</th><th class="num">Abates</th></tr></thead>
-        <tbody>${this.scoreRows(true)}</tbody></table></div>${this.scoreChart(true)}</div>
-        <div class="modal-f"><button type="button" class="btn ghost" data-m="viewmap">Ver o mapa</button><button type="button" class="btn ghost" data-m="quit">Menu</button><button type="button" class="btn primary" data-m="newgame">Nova campanha</button></div>`, { lock: true });
+        <tbody>${this.scoreRows(true)}</tbody></table></div>${this.scoreChart(true)}
+        <div class="sec-lbl">Estatísticas completas</div>${this.finalStatsTable()}
+        ${this.gameAchievementsLine()}</div>
+        <div class="modal-f"><button type="button" class="btn ghost" data-m="viewmap">Ver o mapa</button><button type="button" class="btn ghost" data-m="replay">Replay</button><button type="button" class="btn ghost" data-m="achievements">Conquistas</button><button type="button" class="btn ghost" data-m="quit">Menu</button><button type="button" class="btn primary" data-m="newgame">Nova campanha</button></div>`, { lock: true });
     }
 
     // ---------------------------------------------------------- Ajuda
@@ -1224,6 +1365,7 @@
       this.openModal('quick', `<div class="modal-h"><h2>Primeiros passos</h2>${this.closeX()}</div>
         <div class="modal-b help">
           <ul>
+            <li><b>Objetivos</b> (barra lateral) mostra todas as formas de vencer e o seu progresso.</li>
             <li><b>Toque na sua unidade</b> para ver onde ela pode ir (casas marcadas) e quem pode atacar (anéis vermelhos).</li>
             <li><b>Aldeias</b> viram cidades: pare uma unidade em cima e use <b>Capturar</b> no turno seguinte.</li>
             <li><b>Toque em casas do seu território</b> para colher recursos e construir melhorias. Isso aumenta a população e sobe o nível das cidades.</li>
@@ -1241,6 +1383,7 @@
         <div class="modal-b help">
           <h3>Objetivo</h3>
           <p>No modo <b>Dominação</b>, vença eliminando todas as outras tribos (uma tribo é eliminada ao perder todas as cidades). No modo <b>Pontos</b>, tenha a maior pontuação ao fim do turno limite.</p>
+          <p>Em partidas novas também valem (se ativadas na criação): <b>Científica</b> (Grande Observatório em 3 etapas numa cidade científica, com Educação e 20 tecnologias), <b>Econômica</b> (estrelas acumuladas em rotas comerciais e ao menos uma rota com outra tribo), <b>Maravilhas</b> (5 ao mesmo tempo), <b>Territorial</b> (45% das terras por 5 turnos) e <b>Diplomática</b> (alianças com metade das tribos, nenhuma guerra e reputação positiva por 5 turnos). O botão <b>Objetivos</b> mostra o progresso de todos.</p>
           <h3>Duas moedas</h3>
           <p><b>★ Estrelas</b> vêm do nível das cidades, oficinas, parques, bancos, garimpos, plantações, mercados e rotas comerciais. Pagam unidades, melhorias, construções e maravilhas.</p>
           <p><b>${SCI} Ciência</b> vem das cidades, bibliotecas, universidades e academias. Paga tecnologias, cujo custo aumenta com o número de cidades que você tem.</p>
@@ -1258,14 +1401,36 @@
           <h3>Recursos estratégicos</h3>
           <p>Uma <b>Mina</b> em minério de ferro fornece <b>Ferro</b> (Espadachim, Mosqueteiro e Canhão). Um <b>Pasto</b> em cavalos fornece <b>Cavalos</b> (Cavaleiro). Sem eles, essas unidades não podem ser treinadas.</p>
           <h3>Mar</h3>
-          <p>Com Navegação, construa um Porto: unidades que entram nele embarcam e viram Barcos. Cartografia libera o oceano e Navios; Engenharia Naval, Couraçados. Desembarcar em qualquer praia encerra o movimento.</p>
+          <p>Com Navegação, construa um Porto: unidades que entram nele embarcam e viram Balsas (Nau com Cartografia, Nau de guerra com Engenharia Naval). Desembarcar em qualquer praia encerra o movimento.</p>
+          <p>Cidades com porto também constroem <b>navios de verdade</b>, que nascem no porto e só andam na água: <b>Escuna</b> (rápida, visão 3), <b>Transporte</b> (leva 2 tropas: entre nele com a tropa e use <b>Desembarcar</b> num turno seguinte), <b>Fragata</b> (+50% contra alvos na água) e <b>Couraçado</b> (só em cidades portuárias, com Ferro). Tropas que atacam no turno do desembarque sofrem −25%; se o transporte afundar, a carga afunda junto.</p>
           <h3>Diplomacia</h3>
-          <p>Todas as tribos começam em guerra. Proponha paz no painel Diplomacia; em paz, ninguém ataca ninguém nem entra nas cidades do outro. Quebrar um tratado reduz sua reputação e a IA passa a confiar menos em você.</p>
+          <p>Todas as tribos começam em guerra. No painel Diplomacia você propõe <b>paz</b>, <b>pacto de não agressão</b> (com prazo), <b>aliança</b> (visão compartilhada, tecnologias 20% mais baratas quando o aliado já as tem, chamado às armas), <b>comércio</b> (estrelas, ciência, Ferro e Cavalos por 10 turnos), <b>tributo</b> e <b>guerra conjunta</b>. Cada tribo guarda uma memória do que você fez; romper um pacto (−2) ou trair uma aliança (−3) derruba sua reputação com todos.</p>
+          <h3>Cidades especializadas</h3>
+          <p>A partir do nível 2, cada cidade pode escolher uma especialização (5★; trocar custa 12★): <b>Militar</b>, <b>Científica</b>, <b>Comercial</b>, <b>Agrícola</b> ou <b>Portuária</b>. Cada uma tem bônus e custos claros, construções próprias (Arsenal, Cidadela, Observatório, Academia Real, Guilda, Bolsa, Silos, Aqueduto, Estaleiro, Farol, Alfândega) e marcos nos níveis 6, 8 e 10. No nível 12 a cidade pode virar <b>Metrópole</b>.</p>
+          <h3>Comércio, logística e recursos</h3>
+          <p>Rotas comerciais ligam duas cidades por estrada, porto ou mar e rendem estrelas (e ciência nas rotas com outras tribos). Inimigos sobre o caminho bloqueiam a rota; inimigos ao lado a ameaçam (metade do lucro), a menos que uma fortificação sua proteja o trecho. Estradas podem ser cortadas e melhorias saqueadas; o dono repara.</p>
+          <p>Tropas longe de cidades, território, estradas, portos e fortificações ficam <b>sem suprimentos</b> depois de um turno: −20% (e −35% após 4 turnos) e cura pela metade. O deserto consome suprimentos em dobro. Cavalos aumentam o raio de abastecimento das cidades.</p>
+          <p>Fontes extras de Ferro e Cavalos barateiam as unidades que dependem deles. Gemas, Especiarias e Baleias (Estação baleeira) são <b>luxos</b>: dão lealdade às cidades; gemas barateiam maravilhas e especiarias melhoram rotas com outras tribos.</p>
+          <h3>Combate tático</h3>
+          <ul>
+            <li><b>Flanco</b>: +10% por aliado colado no defensor (máx. +20%); <b>pelas costas</b>: +20% se um aliado estiver do lado oposto.</li>
+            <li><b>Formação</b>: defensores com aliados ao lado ganham até +20%. <b>Terreno elevado</b>: tiros de colinas ou montanhas +25%. <b>Emboscada</b>: quem ataca de uma floresta sem ter se movido ganha +20%.</li>
+            <li><b>Linha de visão</b>: montanhas (e florestas, para quem não está no alto) bloqueiam tiros; catapultas e canhões atiram por cima.</li>
+            <li><b>Ataque de oportunidade</b>: sair do lado de um inimigo corpo a corpo custa um golpe de 35% (unidades com Fuga escapam).</li>
+            <li><b>Habilidades ativas</b> com recarga: Tiro Preciso, Carga, Provocar, Formação Cerrada, Bombardeio, Bênção, Reconhecimento e Bordada.</li>
+            <li><b>Fortificações</b>: Torre de vigia (visão e detecção), Posto avançado (abastece), Forte (defesa ×2) e Fortaleza (×2,5). Inimigos que entram numa fortificação a tomam.</li>
+          </ul>
+          <h3>Ocupação e lealdade</h3>
+          <p>Cidades conquistadas ficam <b>ocupadas</b> por ${PP.OCCUPATION_TURNS} turnos (produção pela metade). Depois se integram se a lealdade for alta; senão entram em <b>resistência</b>. Guarnição, templo, luxos e paz com o antigo dono ajudam; uma cidade em resistência sem guarnição e com lealdade muito baixa pode se revoltar e voltar ao fundador.</p>
+          <h3>Espionagem e névoa</h3>
+          <p>Espiões (Espionagem) são invisíveis para quem não está colado neles. Ao lado de uma cidade estrangeira eles infiltram, roubam mapas, ciência ou tecnologias e sabotam a produção ou as estradas; o risco sobe com a Guarda da Cidade, torres e espiões do alvo. No mapa, casas vistas há pouco mostram as últimas tropas avistadas (inteligência recente).</p>
+          <h3>Eventos mundiais e marcos</h3>
+          <p>Secas, invernos, corridas do ouro, pragas, migrações, descobertas e tempestades são anunciados dois turnos antes e têm duração conhecida (chip no topo da tela). O mapa também tem pontos estratégicos: passos de montanha, estreitos, pontes antigas, portos naturais, minas abandonadas e ruínas imperiais.</p>
           <h3>Maravilhas</h3>
           <p>Cada maravilha só pode ser construída uma vez no mundo, numa casa vazia do seu território. Todas dão +3 de população à cidade e 500 pontos, além do efeito próprio.</p>
           <h3>Tribos</h3><ul>${tribes}</ul>
           <h3>Ruínas</h3>
-          <p>Ruínas marcadas com <b>?</b> dão um prêmio aleatório para a primeira unidade que chegar: estrelas, ciência, tecnologia, um veterano, um mapa ou população.</p>
+          <p>Ruínas marcadas com <b>?</b> têm um tipo (fortaleza, templo, biblioteca, acampamento ou túmulo). Quem chega escolhe: <b>Explorar</b> (prêmio aleatório: estrelas, ciência, tecnologia, veterano, mapa ou população), <b>Saquear</b> (estrelas na hora, mas as outras tribos lembram), <b>Restaurar</b> (vira forte, posto ou santuário) ou <b>Honrar</b> (túmulos).</p>
           <h3>Créditos</h3>
           <p>Ícones de <b>game-icons.net</b>, licença CC BY 3.0, por ${esc(credits)}.</p>
         </div>`, {});

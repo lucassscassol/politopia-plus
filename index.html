@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0d0c0b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Jogo de estratégia por turnos inspirado em Polytopia, com ciência, diplomacia, recursos estratégicos, promoções e maravilhas.">
+<meta name="description" content="Jogo de estratégia por turnos inspirado em Polytopia, com diplomacia profunda, rotas comerciais, especialização de cidades, combate tático, espionagem, eventos mundiais e seis tipos de vitória.">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,7 @@
     <div id="tb-tribe" class="tribe-chip"></div>
     <div class="res res-star" title="Estrelas: pagam unidades, melhorias e construções"><span class="res-ico">★</span><b id="tb-stars">0</b><small id="tb-stars-inc">+0</small></div>
     <div class="res res-sci" title="Ciência: paga tecnologias"><span class="res-ico" data-icon="ui_tech"></span><b id="tb-sci">0</b><small id="tb-sci-inc">+0</small></div>
+    <button type="button" id="tb-event" class="res res-event" hidden></button>
     <div class="res res-turn"><span class="res-lbl">Turno</span><b id="tb-turn">1</b></div>
     <button id="btn-menu" class="icon-btn" type="button" aria-label="Menu" data-icon="ui_menu"></button>
   </header>
@@ -36,6 +37,7 @@
     <button type="button" class="side-btn" id="btn-diplo"><span data-icon="ui_diplo"></span><small>Diplomacia</small><i class="dot" id="diplo-dot" hidden></i></button>
     <button type="button" class="side-btn" id="btn-stats"><span data-icon="ui_stats"></span><small>Placar</small></button>
     <button type="button" class="side-btn" id="btn-log"><span data-icon="ui_log"></span><small>Crônica</small></button>
+    <button type="button" class="side-btn" id="btn-goals"><span data-icon="ui_objectives"></span><small>Objetivos</small></button>
   </nav>
 
   <div id="ai-banner" hidden>
@@ -63,6 +65,7 @@
       <button type="button" id="m-continue" class="btn primary" hidden>Continuar partida</button>
       <button type="button" id="m-new" class="btn primary">Nova campanha</button>
       <button type="button" id="m-help" class="btn ghost">Como jogar</button>
+      <button type="button" id="m-ach" class="btn ghost">Conquistas</button>
     </div>
     <p class="menu-foot">Ao fundo: quatro tribos controladas pela IA disputam um continente.</p>
   </div>
@@ -77,9 +80,25 @@
 <script src="js/icons.js"></script>
 <script src="js/mapgen.js"></script>
 <script src="js/game.js"></script>
+<script src="js/diplomacy.js"></script>
+<script src="js/cities.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/naval.js"></script>
+<script src="js/espionage.js"></script>
+<script src="js/intel.js"></script>
+<script src="js/events.js"></script>
+<script src="js/ruins.js"></script>
+<script src="js/victory.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/replay.js"></script>
+<script src="js/scenarios.js"></script>
+<script src="js/ai-strategy.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/ui-screens.js"></script>
 <script src="js/main.js"></script>
 <!-- PAGE:END -->
 </body>
