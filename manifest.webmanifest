@@ -5,8 +5,8 @@
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#0b1a2e",
-  "theme_color": "#0b1a2e",
+  "background_color": "#0d0c0b",
+  "theme_color": "#0d0c0b",
   "lang": "pt-BR",
   "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

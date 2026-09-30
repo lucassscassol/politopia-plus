@@ -48,7 +48,7 @@
     { id: 'pastoreio',    tier: 2, req: ['montaria'],    name: 'Pastoreio',      icon: '🐴', desc: 'Pasto em Cavalos (recurso estratégico)' },
     { id: 'agricultura',  tier: 2, req: ['organizacao'], name: 'Agricultura',    icon: '🌾', desc: 'Fazenda · Drenar pântano' },
     { id: 'estrategia',   tier: 2, req: ['organizacao'], name: 'Estratégia',     icon: '♟️', desc: 'Unidade: Defensor · Muralhas · Quartel' },
-    { id: 'escrita',      tier: 2, req: ['organizacao'], name: 'Escrita',        icon: '📜', desc: 'Biblioteca (+2⚗)' },
+    { id: 'escrita',      tier: 2, req: ['organizacao'], name: 'Escrita',        icon: '📜', desc: 'Biblioteca (+2⚗\uFE0E)' },
     { id: 'mineracao',    tier: 2, req: ['escalada'],    name: 'Mineração',      icon: '⛏️', desc: 'Mina (Ferro) · Garimpo · Unidade: Piqueiro' },
     { id: 'meditacao',    tier: 2, req: ['escalada'],    name: 'Meditação',      icon: '🧘', desc: 'Templo · Maravilha: Oráculo' },
     { id: 'navegacao',    tier: 2, req: ['pesca'],       name: 'Navegação',      icon: '⛵', desc: 'Porto · unidades embarcam como Barcos em águas rasas' },
@@ -156,18 +156,18 @@
     walls:      { name: 'Muralhas',     icon: '🧱', cost: 5,  tech: 'estrategia', desc: 'Defesa x3 para unidades na cidade' },
     barracks:   { name: 'Quartel',      icon: '🏕️', cost: 6,  tech: 'estrategia', desc: '+2 capacidade de unidades · novas unidades nascem com 1 XP' },
     granary:    { name: 'Celeiro',      icon: '🌽', cost: 6,  tech: 'organizacao', desc: '+2 população', pop: 2 },
-    library:    { name: 'Biblioteca',   icon: '📚', cost: 6,  tech: 'escrita', desc: '+2⚗ por turno', sci: 2 },
+    library:    { name: 'Biblioteca',   icon: '📚', cost: 6,  tech: 'escrita', desc: '+2⚗\uFE0E por turno', sci: 2 },
     temple:     { name: 'Templo',       icon: '⛩️', cost: 8,  tech: 'meditacao', desc: '+1 população · +100 pontos · cura extra na cidade', pop: 1 },
-    university: { name: 'Universidade', icon: '🎓', cost: 12, tech: 'educacao', desc: '+3⚗ por turno (requer Biblioteca)', sci: 3, needs: 'library' },
+    university: { name: 'Universidade', icon: '🎓', cost: 12, tech: 'educacao', desc: '+3⚗\uFE0E por turno (requer Biblioteca)', sci: 3, needs: 'library' },
     bank:       { name: 'Banco',        icon: '🏦', cost: 12, tech: 'economia', desc: '+3★ por turno', gold: 3 },
   };
   PP.BUILDING_ORDER = ['walls', 'barracks', 'granary', 'library', 'temple', 'university', 'bank'];
 
   // ---------------------------------------------------------------- Maravilhas (únicas no mundo)
   PP.WONDERS = {
-    oracle:        { name: 'Oráculo',            icon: '🔮', cost: 14, tech: 'meditacao',   desc: 'Tecnologia grátis imediata e +2⚗ por turno' },
+    oracle:        { name: 'Oráculo',            icon: '🔮', cost: 14, tech: 'meditacao',   desc: 'Tecnologia grátis imediata e +2⚗\uFE0E por turno' },
     pyramids:      { name: 'Pirâmides',          icon: '🔺', cost: 18, tech: 'construcao',  desc: '+3★ por turno' },
-    great_library: { name: 'Grande Biblioteca',  icon: '🏛️', cost: 20, tech: 'filosofia',   desc: '+4⚗ por turno' },
+    great_library: { name: 'Grande Biblioteca',  icon: '🏛️', cost: 20, tech: 'filosofia',   desc: '+4⚗\uFE0E por turno' },
     colossus:      { name: 'Colosso',            icon: '🗽', cost: 18, tech: 'cartografia', desc: '+1★ por turno para cada porto seu', coastal: true },
     great_wall:    { name: 'Grande Muralha',     icon: '🏯', cost: 20, tech: 'arquitetura', desc: '+0,5 no bônus de defesa de todas as suas cidades' },
     eye:           { name: 'Olho dos Deuses',    icon: '👁️', cost: 16, tech: 'educacao',    desc: 'Revela o mapa inteiro' },
@@ -177,9 +177,9 @@
   // ---------------------------------------------------------------- Recompensas de nível de cidade
   PP.REWARDS = {
     workshop:  { name: 'Oficina',     icon: '🔨', desc: '+1★ por turno' },
-    academy:   { name: 'Academia',    icon: '🔭', desc: '+1⚗ por turno' },
+    academy:   { name: 'Academia',    icon: '🔭', desc: '+1⚗\uFE0E por turno' },
     walls:     { name: 'Muralhas',    icon: '🧱', desc: 'Defesa x3 na cidade' },
-    scholars:  { name: 'Estudiosos',  icon: '📖', desc: '+6⚗ imediatamente' },
+    scholars:  { name: 'Estudiosos',  icon: '📖', desc: '+6⚗\uFE0E imediatamente' },
     resources: { name: 'Recursos',    icon: '💰', desc: '+5★ imediatamente' },
     explorer:  { name: 'Explorador',  icon: '🗺️', desc: 'Revela uma grande área do mapa' },
     growth:    { name: 'Crescimento', icon: '🌱', desc: '+3 população' },
@@ -207,45 +207,45 @@
   // ---------------------------------------------------------------- Tribos
   PP.TRIBES = {
     aymara: {
-      name: 'Aymará', color: '#d6453d', dark: '#8e2620', emblem: '🦙', startTech: 'escalada', extraTech: 'mineracao', startUnit: 'warrior',
-      perk: 'Povo das montanhas: começa também com Mineração; Minas e Garimpos dão +1 população extra.',
+      name: 'Aymará', color: '#9e3a2f', dark: '#5a1f19', emblem: '🦙', startTech: 'escalada', extraTech: 'mineracao', startUnit: 'warrior',
+      perk: 'Povo das montanhas: Minas e Garimpos dão +1 população extra.',
       biome: { base: 'plains', alt: 'tundra', altFrac: 0.15, mountain: 0.2, hills: 0.2, forest: 0.18, swamp: 0.0 },
-      tint: '#c9b37a', resBias: { ore: 2, gems: 1.6, horses: 1.2 },
+      tint: '#8a7d5c', resBias: { ore: 2, gems: 1.6, horses: 1.2 },
       syl: [['Pa', 'Chu', 'Qui', 'Ti', 'Ay', 'U', 'Ko', 'Pu', 'Ma', 'Il', 'Sa', 'Wa'], ['ta', 'ni', 'llo', 'ka', 'ma', 'ra', 'wa', 'qa', 'yu', 'ri'], ['pampa', 'marka', 'wasi', 'quta', 'llacta', 'kancha', '']],
     },
     tupina: {
-      name: 'Tupinás', color: '#1f9d55', dark: '#11633a', emblem: '🦜', startTech: 'caca', startUnit: 'warrior',
+      name: 'Tupinás', color: '#4f7a3f', dark: '#2a4422', emblem: '🦜', startTech: 'caca', startUnit: 'warrior',
       perk: 'Filhos da mata: florestas custam 1 de movimento e sempre dão defesa.',
       biome: { base: 'plains', alt: 'swamp', altFrac: 0.08, mountain: 0.05, hills: 0.07, forest: 0.48, swamp: 0.08 },
-      tint: '#5fb04a', resBias: { game: 1.8, fruit: 1.4, spices: 1.6 },
+      tint: '#4d6b3a', resBias: { game: 1.8, fruit: 1.4, spices: 1.6 },
       syl: [['Ita', 'Pira', 'Ara', 'Gua', 'Tu', 'Ja', 'Ibi', 'Iga', 'Mo', 'Cu', 'Ta', 'Ybi'], ['pu', 'ra', 'ti', 'cu', 'ju', 'ma', 'po', 'ba', 'na', 'é'], ['tinga', 'rana', 'guaçu', 'mirim', 'poranga', 'tuba', '']],
     },
     vikar: {
-      name: 'Vikar', color: '#3f93d6', dark: '#1f5c8f', emblem: '🐺', startTech: 'pesca', startUnit: 'warrior',
+      name: 'Vikar', color: '#4a7394', dark: '#263e52', emblem: '🐺', startTech: 'pesca', startUnit: 'warrior',
       perk: 'Navegadores do gelo: embarcações têm +1 de movimento e pescar dá +1 população extra.',
       biome: { base: 'tundra', alt: 'plains', altFrac: 0.25, mountain: 0.12, hills: 0.12, forest: 0.25, swamp: 0.0 },
-      tint: '#d3e0e0', resBias: { fish: 1.8, whale: 2, game: 1.2 },
+      tint: '#7c8783', resBias: { fish: 1.8, whale: 2, game: 1.2 },
       syl: [['Skal', 'Hvit', 'Fjor', 'Ul', 'Rag', 'Tor', 'Isa', 'Bjør', 'Kvik', 'Frey', 'Sig', 'Vall'], ['', 'ne', 'ha', 'vi', 'gar', 'ma'], ['heim', 'vik', 'fjord', 'borg', 'havn', 'dal', 'nes']],
     },
     qadir: {
-      name: 'Qadir', color: '#e5ae1e', dark: '#9a7210', emblem: '🐪', startTech: 'montaria', startUnit: 'rider',
+      name: 'Qadir', color: '#b58a36', dark: '#6a4f1c', emblem: '🐪', startTech: 'montaria', startUnit: 'rider',
       perk: 'Mercadores das dunas: a capital gera +2★ e cada cidade conectada por estrada ou porto gera +1★ extra.',
       biome: { base: 'desert', alt: 'plains', altFrac: 0.2, mountain: 0.07, hills: 0.13, forest: 0.05, swamp: 0.0 },
-      tint: '#e7cf8a', resBias: { horses: 1.8, gems: 1.6, crop: 0.8 },
+      tint: '#a8905f', resBias: { horses: 1.8, gems: 1.6, crop: 0.8 },
       syl: [['Al', 'Qa', 'Sa', 'Mar', 'Zu', 'Ha', 'Ka', 'Ra', 'Da', 'Ja', 'Ba', 'Na'], ['sh', 'dir', 'ma', 'bar', 'ha', 'ra', 'zi', 'li'], ['kand', 'abad', 'ira', 'un', 'ar', 'at', '']],
     },
     hanlu: {
-      name: 'Han-Lu', color: '#8a55cc', dark: '#553280', emblem: '🐉', startTech: 'organizacao', startUnit: 'warrior',
+      name: 'Han-Lu', color: '#6f5391', dark: '#3d2c52', emblem: '🐉', startTech: 'organizacao', startUnit: 'warrior',
       perk: 'Império de jade: tecnologias custam 10% menos.',
       biome: { base: 'plains', alt: 'hills', altFrac: 0.05, mountain: 0.1, hills: 0.1, forest: 0.22, swamp: 0.05 },
-      tint: '#a8d07a', resBias: { crop: 1.8, fruit: 1.2, spices: 1.2 },
+      tint: '#6f8350', resBias: { crop: 1.8, fruit: 1.2, spices: 1.2 },
       syl: [['Lu', 'Shan', 'Hai', 'Jin', 'Xi', 'Long', 'Yu', 'Ming', 'Bai', 'Qing', 'Tian', 'Zhou'], ['', '', 'an', 'ling'], ['jing', 'yang', 'men', 'kou', 'shan', 'du', 'ping', 'zhou']],
     },
     zambe: {
-      name: 'Zambé', color: '#e46f22', dark: '#9a4410', emblem: '🦁', startTech: 'caca', startUnit: 'warrior', extraUnit: 'warrior',
+      name: 'Zambé', color: '#b2602b', dark: '#653414', emblem: '🦁', startTech: 'caca', startUnit: 'warrior', extraUnit: 'warrior',
       perk: 'Guerreiros da savana: começam com um guerreiro extra; unidades ganham XP em dobro e curam +2.',
       biome: { base: 'plains', alt: 'desert', altFrac: 0.12, mountain: 0.05, hills: 0.15, forest: 0.14, swamp: 0.05 },
-      tint: '#cfc267', resBias: { game: 1.4, horses: 1.4, fruit: 1.2 },
+      tint: '#8f874f', resBias: { game: 1.4, horses: 1.4, fruit: 1.2 },
       syl: [['Zam', 'Ku', 'Mbe', 'Ta', 'Nya', 'Ki', 'Ma', 'Lu', 'Ba', 'Oyo', 'Ze', 'Dan'], ['la', 'bu', 'ngo', 'si', 'ri', 'ka', 'we'], ['mbe', 'wa', 'la', 'ndi', 'ga', 'ro', '']],
     },
   };

@@ -1,10 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="28" fill="#0b1a2e"/>
-  <path d="M64 30 108 52 64 74 20 52Z" fill="#9cc85a"/>
-  <path d="M20 52 64 74v14L20 66Z" fill="#6e8f3c"/>
-  <path d="M108 52 64 74v14l44-22Z" fill="#587532"/>
-  <path d="M52 56 64 26l12 30Z" fill="#8f8a7d"/>
-  <path d="M64 26l-5 12 5-3 5 4Z" fill="#f4f6f8"/>
-  <circle cx="84" cy="50" r="11" fill="#f2b632"/>
-  <path d="M84 43l2 5h5l-4 3 1.6 5-4.6-3-4.6 3 1.6-5-4-3h5Z" fill="#2b1d00"/>
+  <rect width="128" height="128" rx="22" fill="#0d0c0b"/>
+  <path d="M24 16H104V60Q104 94 64 118Q24 94 24 60Z" fill="#9e3a2f" stroke="#c9a45c" stroke-width="3"/>
+  <path d="M31 23H97V60Q97 88 64 108Q31 88 31 60Z" fill="none" stroke="rgba(227,196,127,.5)" stroke-width="1.5"/>
+  <g transform="translate(36 30) scale(0.109)"><path fill="#ece3cf" d="lorc/crossed-swords"/></g>
 </svg>

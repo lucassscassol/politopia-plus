@@ -4,6 +4,10 @@ Jogo de estratégia por turnos para navegador e celular, inspirado em **The Batt
 
 Roda direto no navegador, sem build e sem dependências: HTML, CSS e JavaScript puro, com o mapa desenhado em Canvas isométrico.
 
+## Visual
+
+Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em cada terreno, luz vinda da esquerda, vegetação diferente por bioma (pinheiros nevados, matas fechadas, acácias da savana, arbustos secos do deserto), cidades de pedra com torre de menagem e estandartes, unidades como escudos heráldicos na cor da tribo, névoa de fumaça no território inexplorado e cinzas flutuando no ar (dá para desligar no menu). Títulos em Cinzel e texto em Alegreya Sans.
+
 ## Como jogar
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
@@ -63,6 +67,7 @@ index.html            página do jogo
 css/style.css         interface (HUD, painéis, modais)
 js/util.js            RNG com semente e ruído para mapas
 js/data.js            regras em dados: terrenos, recursos, tecnologias, unidades, tribos...
+js/icons.js           ícones vetoriais (gerado por tools/build-icons.py a partir de tools/icons.json)
 js/mapgen.js          geração procedural (biomas por tribo, garantias de justiça)
 js/game.js            motor de regras, sem DOM (roda no Node)
 js/ai.js              IA: pesquisa, economia, táticas, cerco, navegação e diplomacia
@@ -80,3 +85,7 @@ node tests/sim.js 20 80
 ```
 
 O simulador verifica a cada turno a consistência do tabuleiro (grade de unidades, cidades, recursos negativos) e testa que salvar e carregar reproduz o mesmo estado.
+
+## Créditos
+
+Ícones de [game-icons.net](https://game-icons.net), licença [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), pelos autores Lorc, Delapouite, Skoll, Caro Asercion, Cathelineau, Darkzaitzev, Faithtoken, HeavenlyDog e Sbed. Para trocar um ícone, edite `tools/icons.json` e rode `python3 tools/build-icons.py`.
