@@ -1,16 +1,31 @@
-/* Politopia+ — motor de regras. Não depende do DOM (pode rodar no Node para testes). */
+/* Politopia+ — motor de regras. Não depende do DOM (pode rodar no Node para testes).
+   O núcleo cuida de mapa, unidades, cidades, turnos e salvamento. Os sistemas estendidos
+   (diplomacia, economia, cidades, combate tático, naval, espionagem, eventos, vitórias...)
+   ficam em módulos próprios que se registram com PP.registerSystem e se ligam por ganchos. */
 (function (PP) {
   'use strict';
   const TER = PP.TERRAIN, UN = PP.UNITS;
   const DIRS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  const SAVE_VERSION = 2;
 
   function cheb(a, b) { return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)); }
   function skillSet(list) { const s = {}; for (const k of list) s[k] = true; return s; }
   for (const k in UN) UN[k]._sk = skillSet(UN[k].skills);
   PP.NAVAL.forEach(n => { if (n) n._sk = skillSet(n.skills); });
 
+  // ---------------------------------------------------------------- Registro de sistemas
+  // Cada sistema é um objeto com ganchos opcionais: configure, init, load, ready, save,
+  // beforeTurn, income, afterTurnStart, endTurn, newRound, capture, found, unitKilled,
+  // trained, moved, attacked, eliminated, gameover.
+  PP.SYSTEMS = PP.SYSTEMS || [];
+  PP.registerSystem = function (name, sys) {
+    const i = PP.SYSTEMS.findIndex(s => s.name === name);
+    const entry = Object.assign({ name }, sys);
+    if (i >= 0) PP.SYSTEMS[i] = entry; else PP.SYSTEMS.push(entry);
+  };
+
   class Game {
-    constructor() { this.listeners = []; }
+    constructor() { this.listeners = []; this.cache = {}; }
 
     on(fn) { this.listeners.push(fn); return () => { this.listeners = this.listeners.filter(f => f !== fn); }; }
     emit(type, data) {
@@ -18,17 +33,25 @@
         try { fn(type, data || {}); } catch (e) { console.error(e); }
       }
     }
+    hook(name, a, b, c, d) {
+      for (const s of PP.SYSTEMS) {
+        if (typeof s[name] === 'function') s[name](this, a, b, c, d);
+      }
+    }
+    // Invalida caches derivados do tabuleiro (recursos acessíveis, abastecimento...)
+    invalidate() { this.cache = {}; }
 
     // ============================================================ Criação
     setup(opts) {
-      this.opts = Object.assign({ size: 18, mapType: 'continentes', difficulty: 'normal', victory: 'dominacao', turnLimit: 40 }, opts);
+      this.opts = Object.assign({ size: 18, mapType: 'continentes', difficulty: 'normal', victory: 'dominacao', turnLimit: 40, scenario: 'normal' }, opts);
       if (!this.opts.seed) this.opts.seed = (Math.random() * 2147483647) | 0;
+      this.hook('configure');
       this.W = this.H = this.opts.size;
       this.rng = new PP.RNG(this.opts.seed);
       this.turn = 1; this.current = 0; this.nextId = 1;
       this.units = []; this.cities = []; this.players = [];
       this.wonders = {}; this.over = false; this.winner = null; this.endReason = null;
-      this.logs = []; this.history = []; this.usedNames = {};
+      this.logs = []; this.history = []; this.usedNames = {}; this.cache = {};
       this.opts.players.forEach((po, i) => this.players.push(this.newPlayer(i, po)));
       const caps = PP.generateMap(this);
       this.rebuildIndex();
@@ -43,7 +66,9 @@
           if (spot) this.createUnit(tr.extraUnit, p.id, spot.x, spot.y, c.id);
         }
       });
+      this.hook('init');
       this.players.forEach(p => this.updateVision(p));
+      this.hook('ready');
       this.recordHistory();
       this.beginTurn();
       return this;
@@ -68,6 +93,7 @@
       this.cityMap = {};
       for (const c of this.cities) { this.cityMap[c.id] = c; this.usedNames[c.name] = 1; }
       for (const u of this.units) this.uGrid[u.y * this.W + u.x] = u;
+      this.invalidate();
     }
 
     // ============================================================ Consultas básicas
@@ -93,6 +119,7 @@
     citiesOf(pid) { return this.cities.filter(c => c.owner === pid); }
     unitsOf(pid) { return this.units.filter(u => u.owner === pid); }
     navalLevel(p) { return this.has(p, 'eng_naval') ? 3 : this.has(p, 'cartografia') ? 2 : this.has(p, 'navegacao') ? 1 : 0; }
+    isNavalType(type) { return !!(UN[type] && UN[type].naval); }
     get currentPlayer() { return this.players[this.current]; }
 
     atWar(a, b) {
@@ -126,12 +153,14 @@
         origCapital: capital ? owner : -1, buildings: {}, workshop: 0, academy: 0, parks: 0, radius: 1,
         connected: false, founded: this.turn,
       };
+      if (this.ensureCity) this.ensureCity(c, owner);
       this.cities.push(c);
       this.cityMap[c.id] = c;
-      t.city = c.id; t.village = false; t.res = null; t.imp = null; t.ruin = false;
+      t.city = c.id; t.village = false; t.res = null; t.imp = null; t.ruin = false; t.fort = null;
       t.owner = owner; t.cityId = c.id;
       this.claimTerritory(c);
       if (capital) this.players[owner].capital = c.id;
+      this.invalidate();
       return c;
     }
 
@@ -140,6 +169,7 @@
         const t = this.tile(c.x + dx, c.y + dy);
         if (t && t.owner === -1) { t.owner = c.owner; t.cityId = c.id; }
       }
+      this.invalidate();
     }
 
     createUnit(type, owner, x, y, home, ready) {
@@ -161,7 +191,10 @@
       const p = this.players[u.owner];
       const t = this.tiles[u.y * this.W + u.x];
       let s;
-      if (TER[t.terrain].water) {
+      if (base.naval) {
+        s = { name: base.name, icon: base.icon, atk: base.atk, def: base.def, move: base.move + (p.tribe === 'vikar' ? 1 : 0), range: base.range,
+          vision: base.vision, skills: base._sk, naval: true, ship: true, mounted: false };
+      } else if (TER[t.terrain].water && !(t.landmark === 'vau')) {
         const N = PP.NAVAL[Math.max(1, this.navalLevel(p))];
         s = { name: N.name, icon: N.icon, atk: N.atk, def: N.def, move: N.move + (p.tribe === 'vikar' ? 1 : 0), range: N.range,
           vision: 2, skills: N._sk, naval: true, mounted: false };
@@ -175,11 +208,16 @@
         else if (pr === 'agilidade') s.move += 1;
       }
       s.maxHp = this.maxHp(u);
+      if (this.statMods) this.statMods(u, s, t, p);
       return s;
     }
 
-    cityUnits(c) { return this.units.filter(u => u.home === c.id); }
-    capacity(c) { return c.level + 1 + (c.buildings.barracks ? 2 : 0); }
+    cityUnits(c) {
+      const list = this.units.filter(u => u.home === c.id);
+      if (this.cargoUnits) for (const x of this.cargoUnits()) if (x.home === c.id) list.push(x);
+      return list;
+    }
+    capacity(c) { return Math.max(1, c.level + 1 + (c.buildings.barracks ? 2 : 0) + (this.capacityBonus ? this.capacityBonus(c) : 0)); }
 
     // ============================================================ Visão e contato
     updateVision(p) {
@@ -190,13 +228,37 @@
         for (let y = Math.max(0, cy - r); y <= Math.min(H - 1, cy + r); y++)
           for (let x = Math.max(0, cx - r); x <= Math.min(W - 1, cx + r); x++) vis[y * W + x] = 1;
       };
-      for (const u of this.units) if (u.owner === p.id) mark(u.x, u.y, this.stat(u).vision);
-      for (const c of this.cities) if (c.owner === p.id) mark(c.x, c.y, c.radius + 1);
+      const owners = this.visionOwners ? this.visionOwners(p) : [p.id];
+      const own = id => owners.indexOf(id) >= 0;
+      for (const u of this.units) if (own(u.owner)) mark(u.x, u.y, this.stat(u).vision);
+      for (const c of this.cities) if (own(c.owner)) mark(c.x, c.y, c.radius + 1 + (this.cityVisionBonus ? this.cityVisionBonus(c) : 0));
       for (let i = 0; i < this.tiles.length; i++) {
-        if (this.tiles[i].owner === p.id) vis[i] = 1;
-        if (vis[i]) p.explored[i] = 1;
+        const t = this.tiles[i];
+        if (own(t.owner)) vis[i] = 1;
+        if (t.fort && own(t.fort.owner)) mark(t.x, t.y, PP.FORTS[t.fort.type].vision);
       }
+      for (let i = 0; i < vis.length; i++) if (vis[i]) p.explored[i] = 1;
       this.checkMeet(p);
+      this.hook('vision', p);
+    }
+
+    // Atualiza a visão do dono e dos aliados dele (visão compartilhada)
+    refreshVision(pid) {
+      const p = this.players[pid];
+      if (!p) return;
+      this.updateVision(p);
+      if (this.alliesOf) for (const a of this.alliesOf(pid)) this.updateVision(this.players[a]);
+    }
+
+    // Unidade visível para o jogador? (visão + furtividade)
+    unitVisibleTo(u, pid) {
+      if (pid < 0) return true;
+      if (u.owner === pid) return true;
+      const p = this.players[pid];
+      if (!p || !p.visible[u.y * this.W + u.x]) return false;
+      if (this.allied && this.allied(u.owner, pid)) return true;
+      if (this.isStealthed && this.isStealthed(u)) return this.detects(pid, u.x, u.y);
+      return true;
     }
 
     checkMeet(p) {
@@ -205,7 +267,7 @@
         if (!vis[i]) continue;
         const t = this.tiles[i], u = this.uGrid[i];
         let q = -1;
-        if (u && u.owner !== p.id) q = u.owner;
+        if (u && u.owner !== p.id && this.unitVisibleTo(u, p.id)) q = u.owner;
         else if (t.owner >= 0 && t.owner !== p.id) q = t.owner;
         if (q >= 0 && !p.met[q] && this.players[q].alive) this.meet(p, this.players[q]);
       }
@@ -215,6 +277,7 @@
       a.met[b.id] = true; b.met[a.id] = true;
       this.log(`${a.name} encontrou ${b.name}.`, [a.id, b.id]);
       this.emit('meet', { a: a.id, b: b.id });
+      this.hook('met', a, b);
     }
 
     reveal(p, cx, cy, r) {
@@ -224,25 +287,43 @@
 
     // ============================================================ Movimento
     enterCost(u, st, p, from, to) {
-      const tw = TER[to.terrain].water, fw = TER[from.terrain].water;
+      const base = UN[u.type];
+      const ford = to.landmark === 'vau';
+      const tw = TER[to.terrain].water && !ford, fw = TER[from.terrain].water && from.landmark !== 'vau';
+      if (base.naval) {
+        // Navios de verdade só andam na água (vau também serve de passagem)
+        if (!TER[to.terrain].water) return null;
+        const nl = this.navalLevel(p);
+        if (to.terrain === 'ocean' && nl < 2) return null;
+        let cost = 1;
+        if (this.eventActive && this.eventActive('storm') && to.terrain === 'ocean') cost = 2;
+        return { cost, stop: false };
+      }
       if (tw) {
         if (!fw) {
-          if (to.imp === 'port' && to.owner === u.owner && this.navalLevel(p) >= 1) return { cost: 1, stop: true };
+          if (this.navalLevel(p) < 1) return null;
+          if (to.imp === 'port' && to.owner === u.owner) return { cost: 1, stop: true };
+          // Vikar: embarcam de qualquer costa rasa
+          if (p.tribe === 'vikar' && to.terrain === 'water') return { cost: 1, stop: true };
           return null;
         }
         const nl = this.navalLevel(p);
         if (nl < 1 || (to.terrain === 'ocean' && nl < 2)) return null;
-        return { cost: 1, stop: false };
+        let cost = 1;
+        if (this.eventActive && this.eventActive('storm') && to.terrain === 'ocean') cost = 2;
+        return { cost, stop: false };
       }
-      if (to.terrain === 'mountain' && (!this.has(p, 'escalada') || UN[u.type].mounted)) return null;
+      if (to.terrain === 'mountain' && (!this.has(p, 'escalada') || base.mounted)) return null;
       if (to.city) {
         const c = this.cityMap[to.city];
         if (c.owner !== u.owner && !this.atWar(u.owner, c.owner)) return null;
       }
       if (fw) return { cost: 1, stop: true };
-      let cost = TER[to.terrain].cost;
+      let cost = ford ? 2 : TER[to.terrain].cost;
       if (st.skills.creep) cost = 1;
       else if (to.terrain === 'forest' && p.tribe === 'tupina') cost = 1;
+      else if (to.terrain === 'mountain' && p.tribe === 'aymara') cost = 1;
+      if (this.eventActive && this.eventActive('winter') && (to.terrain === 'tundra' || to.terrain === 'mountain') && p.tribe !== 'vikar') cost += 1;
       if ((from.road || from.city) && (to.road || to.city) && (from.road || to.road)) cost = 0.5;
       return { cost, stop: false };
     }
@@ -250,7 +331,7 @@
     zocGrid(owner) {
       const z = new Uint8Array(this.W * this.H);
       for (const e of this.units) {
-        if (!this.atWar(owner, e.owner)) continue;
+        if (!this.atWar(owner, e.owner) || UN[e.type].spy) continue;
         for (const d of DIRS) {
           const x = e.x + d[0], y = e.y + d[1];
           if (this.inb(x, y)) z[y * this.W + x] = 1;
@@ -259,13 +340,13 @@
       return z;
     }
 
-    // Casas alcançáveis neste turno: Map(índice -> {spent, prev, stop})
+    // Casas alcançáveis neste turno: Map(índice -> {spent, prev, stop, board})
     reachable(u) {
       const res = new Map();
       res.all = new Map();
       if (u.mp <= 0) return res;
       const W = this.W, p = this.players[u.owner], st = this.stat(u);
-      const zoc = this.zocGrid(u.owner);
+      const zoc = UN[u.type].spy ? new Uint8Array(W * this.H) : this.zocGrid(u.owner);
       const start = u.y * W + u.x;
       const best = res.all;
       best.set(start, { spent: 0, prev: -1, stop: false, done: false, occ: false });
@@ -286,16 +367,25 @@
           const ni = ny * W + nx;
           if (!p.explored[ni]) continue;
           const occ = this.uGrid[ni];
-          if (occ && occ.owner !== u.owner) continue;
+          let board = false, pass = false;
+          if (occ) {
+            if (occ.owner === u.owner) {
+              if (this.canBoard && this.canBoard(u, occ)) board = true;
+              else pass = true;
+            } else if (this.allied && this.allied(occ.owner, u.owner)) pass = true;
+            else continue;
+          }
           const nt = this.tiles[ni];
-          const info = this.enterCost(u, st, p, ct, nt);
+          let info;
+          if (board) info = { cost: 1, stop: true };
+          else info = this.enterCost(u, st, p, ct, nt);
           if (!info) continue;
           const spent = node.spent + info.cost;
           const stop = info.stop || zoc[ni] === 1;
           const ex = best.get(ni);
           if (ex && ex.done) continue;
           if (!ex || spent < ex.spent - 1e-9 || (Math.abs(spent - ex.spent) < 1e-9 && ex.stop && !stop)) {
-            best.set(ni, { spent, prev: cur, stop, done: false, occ: !!occ });
+            best.set(ni, { spent, prev: cur, stop, done: false, occ: pass, board });
             open.push(ni);
           }
         }
@@ -312,8 +402,10 @@
       if (!node) return false;
       const path = [];
       for (let c = k; c !== u.y * this.W + u.x && c >= 0; c = reach.all.get(c).prev) path.unshift({ x: c % this.W, y: (c / this.W) | 0 });
+      if (node.board) return this.board(u, this.uGrid[k], path);
       const before = this.stat(u);
       const from = { x: u.x, y: u.y };
+      const threats = this.opportunityThreats ? this.opportunityThreats(u) : [];
       this.uGrid[u.y * this.W + u.x] = null;
       u.x = x; u.y = y;
       this.uGrid[k] = u;
@@ -321,16 +413,24 @@
       u.moved = true; u.fortified = false;
       if (!before.skills.dash) u.canAttack = false;
       this.emit('move', { unit: u, from, path });
+      if (threats.length && this.opportunityAttacks) this.opportunityAttacks(u, threats);
+      if (u.dead) { this.refreshVision(u.owner); return true; }
       const t = this.tiles[k];
       if (t.ruin) this.exploreRuin(u, t);
-      this.updateVision(this.players[u.owner]);
+      this.hook('moved', u, from);
+      this.refreshVision(u.owner);
       return true;
     }
 
     // ============================================================ Ruínas
+    // Com o sistema de ruínas, jogadores humanos recebem uma escolha; a IA decide na hora.
     exploreRuin(u, t) {
+      if (this.ruinChoice && this.ruinChoice(u, t)) return;
+      this.ruinExplore(this.players[u.owner], t, u);
+    }
+
+    ruinExplore(p, t, u) {
       t.ruin = false;
-      const p = this.players[u.owner];
       let r = this.rng.weighted([['stars', 3], ['science', 3], ['tech', 2], ['unit', 2], ['map', 2], ['pop', 2]]);
       let text = '';
       if (r === 'tech') {
@@ -357,6 +457,7 @@
       if (r === 'science') { p.science += 8; text = 'encontrou pergaminhos: +8⚗!'; }
       if (r === 'stars') { p.stars += 10; text = 'encontrou um tesouro: +10★!'; }
       this.log(`${p.name} explorou ruínas e ${text}`, p.id);
+      this.hook('ruin', p, t, r);
       this.emit('ruin', { player: p.id, tile: t, reward: r, text });
     }
 
@@ -367,8 +468,10 @@
       const st = this.stat(d);
       let b = 1;
       if (t.city && this.cityMap[t.city].owner === d.owner) {
-        b = this.cityMap[t.city].buildings.walls ? 3 : 1.5;
+        const c = this.cityMap[t.city];
+        b = c.buildings.walls ? 3 : 1.5;
         if (this.wonders.great_wall === d.owner) b += 0.5;
+        if (this.cityDefenseExtra) b += this.cityDefenseExtra(c);
       } else if (!st.naval) {
         if (t.terrain === 'forest' && (this.has(p, 'arco') || p.tribe === 'tupina')) b = 1.5;
         else if (t.terrain === 'mountain' && this.has(p, 'escalada')) b = 1.5;
@@ -377,6 +480,7 @@
       }
       if (d.fortified) b *= 1.25;
       if (attacker && st.skills.antimount && this.stat(attacker).mounted) b *= 2;
+      if (this.defenseMods) b = this.defenseMods(d, attacker, b, t, st);
       return b;
     }
 
@@ -384,23 +488,27 @@
       const sa = this.stat(a), sd = this.stat(d);
       let atk = sa.atk;
       if (sa.skills.antimount && sd.mounted) atk *= 1.5;
+      const mods = this.combatMods ? this.combatMods(a, d, sa, sd) : { atk: 1, notes: [] };
+      atk *= mods.atk;
       const aF = atk * a.hp / sa.maxHp;
-      const dF = sd.def * d.hp / sd.maxHp * this.defenseBonus(d, a);
+      const dF = sd.def * d.hp / sd.maxHp * this.defenseBonus(d, a) * (mods.def || 1);
       const tot = aF + dF;
-      const dmg = tot > 0 ? Math.round(aF / tot * atk * 4.5) : 0;
+      const dmg = tot > 0 ? Math.round(aF / tot * atk * 4.5 * (mods.dmg || 1)) : 0;
       const ret = tot > 0 ? Math.round(dF / tot * sd.def * 4.5) : 0;
       const kill = dmg >= d.hp;
-      const retaliates = !kill && !sd.skills.stiff && sd.def > 0 && cheb(a, d) <= sd.range;
-      return { dmg, ret: retaliates ? ret : 0, kill, retaliates, retKill: retaliates && ret >= a.hp };
+      const retaliates = !kill && !sd.skills.stiff && sd.def > 0 && cheb(a, d) <= sd.range && !mods.noRet;
+      return { dmg, ret: retaliates ? ret : 0, kill, retaliates, retKill: retaliates && ret >= a.hp, notes: mods.notes };
     }
 
     canAttackUnit(a, d) {
-      if (!a.canAttack || !d || a.owner === d.owner) return false;
+      if (!a.canAttack || !d || d.dead || a.owner === d.owner) return false;
       const st = this.stat(a);
       if (st.atk <= 0) return false;
       if (!this.atWar(a.owner, d.owner)) return false;
       if (cheb(a, d) > st.range) return false;
-      return !!this.players[a.owner].visible[d.y * this.W + d.x];
+      if (!this.unitVisibleTo(d, a.owner)) return false;
+      if (this.attackAllowed && !this.attackAllowed(a, d, st)) return false;
+      return true;
     }
 
     attackTargets(a) {
@@ -417,17 +525,18 @@
       const r = this.previewAttack(a, d);
       const sa = this.stat(a);
       const dPos = { x: d.x, y: d.y };
+      const dOwner = d.owner;
       d.hp -= r.dmg;
       a.canAttack = false; a.attacked = true; a.fortified = false;
       if (!sa.skills.escape) a.mp = 0;
-      const ev = { attacker: a, defender: d, dmg: r.dmg, ret: 0, killed: false, attackerKilled: false, splash: [], from: { x: a.x, y: a.y }, to: dPos };
+      const ev = { attacker: a, defender: d, dmg: r.dmg, ret: 0, killed: false, attackerKilled: false, splash: [], from: { x: a.x, y: a.y }, to: dPos, notes: r.notes };
       if (d.hp <= 0) {
         ev.killed = true;
         this.killUnit(d, a);
         this.gainXp(a, 1);
         if (sa.skills.persist) a.canAttack = true;
         // Unidades corpo a corpo avançam para a casa do derrotado
-        if (sa.range === 1 && !sa.skills.stiff) {
+        if (sa.range === 1 && !sa.skills.stiff && !(a.buff && a.buff.aim)) {
           const tt = this.tiles[dPos.y * this.W + dPos.x];
           const ft = this.tiles[a.y * this.W + a.x];
           if (this.isWater(tt) === this.isWater(ft) && this.enterCost(a, sa, this.players[a.owner], ft, tt)) {
@@ -442,8 +551,9 @@
         a.hp -= r.ret; ev.ret = r.ret;
         if (a.hp <= 0) { ev.attackerKilled = true; this.killUnit(a, d); this.gainXp(d, 1); }
       }
-      if (sa.skills.splash) {
-        const splash = Math.floor(r.dmg / 2);
+      const splashFrac = sa.skills.splash ? 0.5 : (a.buff && a.buff.bombard ? 0.5 : 0);
+      if (splashFrac) {
+        const splash = Math.floor(r.dmg * splashFrac);
         for (const n of this.neighbors(dPos)) {
           const e = this.uGrid[n.y * this.W + n.x];
           if (e && e !== a && this.atWar(a.owner, e.owner) && splash > 0) {
@@ -453,9 +563,10 @@
           }
         }
       }
+      this.hook('attacked', a, ev, dOwner);
       this.emit('attack', ev);
-      this.updateVision(this.players[a.owner]);
-      if (this.players[d.owner]) this.updateVision(this.players[d.owner]);
+      this.refreshVision(a.owner);
+      if (this.players[dOwner]) this.refreshVision(dOwner);
       return ev;
     }
 
@@ -467,6 +578,7 @@
       u.dead = true;
       this.players[u.owner].stats.losses++;
       if (killer) this.players[killer.owner].stats.kills++;
+      this.hook('unitKilled', u, killer);
       this.emit('death', { unit: u, killer });
     }
 
@@ -495,7 +607,7 @@
 
     // ============================================================ Outras ações de unidade
     canCapture(u) {
-      if (u.moved || u.attacked) return false;
+      if (u.moved || u.attacked || UN[u.type].naval || UN[u.type].spy) return false;
       const t = this.tileAt(u);
       if (t.village) return true;
       if (t.city) { const c = this.cityMap[t.city]; return c.owner !== u.owner && this.atWar(u.owner, c.owner); }
@@ -509,6 +621,7 @@
       if (t.village) {
         c = this.createCity(u.owner, t.x, t.y, false);
         this.log(`${p.name} fundou ${c.name}.`, p.id);
+        this.hook('found', c, p);
       } else {
         c = this.cityMap[t.city];
         old = this.players[c.owner];
@@ -519,12 +632,14 @@
         for (const tt of this.tiles) if (tt.cityId === c.id) tt.owner = u.owner;
         for (const x of this.units) if (x.home === c.id && x.owner !== u.owner) x.home = null;
         p.stats.captured++;
+        this.invalidate();
         this.log(`${p.name} conquistou ${c.name} de ${old.name}!`, null);
+        this.hook('capture', c, old, p);
       }
       u.mp = 0; u.canAttack = false; u.moved = true;
       this.emit('capture', { unit: u, city: c, from: old ? old.id : -1 });
-      this.updateVision(p);
-      if (old) { this.updateVision(old); this.checkElimination(old); }
+      this.refreshVision(p.id);
+      if (old) { this.refreshVision(old.id); this.checkElimination(old); }
       this.checkVictory();
       return true;
     }
@@ -534,9 +649,12 @@
       if (!this.canRecover(u)) return false;
       const t = this.tileAt(u), p = this.players[u.owner];
       let amt = 2;
-      if (t.owner === u.owner) amt = 4;
-      if (t.city && this.cityMap[t.city].owner === u.owner) amt = 6 + (this.cityMap[t.city].buildings.temple ? 3 : 0);
+      const friendly = t.owner === u.owner || (this.allied && t.owner >= 0 && this.allied(t.owner, u.owner)) ||
+        (t.fort && PP.FORTS[t.fort.type].heal && t.fort.owner === u.owner);
+      if (friendly) amt = 4;
+      if (t.city && this.cityMap[t.city].owner === u.owner) amt = 6 + (this.cityMap[t.city].buildings.temple ? 3 : 0) + (this.cityHealBonus ? this.cityHealBonus(this.cityMap[t.city]) : 0);
       if (p.tribe === 'zambe') amt += 2;
+      if (this.supplyLevel && this.supplyLevel(u) > 0) amt = Math.max(1, Math.floor(amt / 2));
       const before = u.hp;
       u.hp = Math.min(this.maxHp(u), u.hp + amt);
       u.mp = 0; u.canAttack = false; u.moved = true;
@@ -573,17 +691,18 @@
     convertTargets(u) {
       if (!this.stat(u).skills.convert || !u.canAttack) return [];
       return this.units.filter(d => cheb(u, d) === 1 && d.owner !== u.owner && this.atWar(u.owner, d.owner) &&
-        this.players[u.owner].visible[d.y * this.W + d.x]);
+        !UN[d.type].naval && this.unitVisibleTo(d, u.owner));
     }
     convert(u, d) {
       if (this.convertTargets(u).indexOf(d) < 0) return false;
       const old = this.players[d.owner];
       d.owner = u.owner; d.home = null; d.mp = 0; d.canAttack = false; d.moved = true; d.fortified = false;
+      d.buff = null;
       u.canAttack = false; u.attacked = true; u.mp = 0;
       this.gainXp(u, 1);
       this.emit('convert', { unit: u, target: d, from: old.id });
-      this.updateVision(this.players[u.owner]);
-      this.updateVision(old);
+      this.refreshVision(u.owner);
+      this.refreshVision(old.id);
       return true;
     }
 
@@ -594,53 +713,71 @@
       this.units.splice(i, 1);
       this.uGrid[u.y * this.W + u.x] = null;
       u.dead = true;
+      if (u.cargo && u.cargo.length && this.dropCargo) this.dropCargo(u, null);
       this.emit('death', { unit: u, disband: true });
-      this.updateVision(this.players[u.owner]);
+      this.refreshVision(u.owner);
       return true;
     }
 
     // ============================================================ Treinar unidades
     hasStrategic(p, key) {
+      if (this.resourceAccess) return (this.resourceAccess(p)[key] || 0) > 0;
       const imp = PP.STRATEGIC[key].imp;
       for (const t of this.tiles) if (t.owner === p.id && t.imp === imp) return true;
       return false;
     }
 
+    unitCostFor(p, c, type) { return this.unitCost ? this.unitCost(p, c, type) : UN[type].cost; }
+
     trainCheck(p, c, type) {
       const d = UN[type];
-      const r = { ok: false, cost: d.cost, reason: '' };
+      const r = { ok: false, cost: this.unitCostFor(p, c, type), reason: '' };
       if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
+      if (d.special) { r.reason = 'Não pode ser recrutada'; r.locked = true; return r; }
       if (d.tech && !this.has(p, d.tech)) { r.reason = 'Requer ' + PP.TECH[d.tech].name; r.locked = true; return r; }
-      if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = 'Requer ' + PP.STRATEGIC[d.needs].name; return r; }
-      if (this.uGrid[c.y * this.W + c.x]) { r.reason = 'Cidade ocupada'; return r; }
+      if (d.naval) {
+        if (!this.hasHarbor(c)) { r.reason = 'Requer um porto no território da cidade'; r.locked = true; return r; }
+        if (d.portSpec && c.spec !== 'porto') { r.reason = 'Só em cidades portuárias'; return r; }
+        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = 'Requer ' + PP.STRATEGIC[d.needs].name; return r; }
+        if (!this.harborTile(c)) { r.reason = 'Porto ocupado'; return r; }
+      } else {
+        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = 'Requer ' + PP.STRATEGIC[d.needs].name; return r; }
+        if (this.uGrid[c.y * this.W + c.x]) { r.reason = 'Cidade ocupada'; return r; }
+      }
       if (this.cityUnits(c).length >= this.capacity(c)) { r.reason = 'Capacidade máxima'; return r; }
-      if (p.stars < d.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
       r.ok = true;
       return r;
     }
 
     train(p, c, type) {
-      if (this.over || p.id !== this.current || !this.trainCheck(p, c, type).ok) return null;
-      p.stars -= UN[type].cost;
-      const u = this.createUnit(type, p.id, c.x, c.y, c.id);
+      if (this.over || p.id !== this.current) return null;
+      const chk = this.trainCheck(p, c, type);
+      if (!chk.ok) return null;
+      p.stars -= chk.cost;
+      let spot = c;
+      if (UN[type].naval) spot = this.harborTile(c);
+      const u = this.createUnit(type, p.id, spot.x, spot.y, c.id);
       if (c.buildings.barracks) u.xp = 1;
+      if (this.recruitXp) u.xp += this.recruitXp(c, type);
+      this.hook('trained', u, c);
       this.emit('train', { unit: u, city: c });
-      this.updateVision(p);
+      this.refreshVision(p.id);
       return u;
     }
 
     // ============================================================ Melhorias de terreno
-    tileEmpty(t) { return !t.res && !t.imp && !t.city && !t.village && !t.wonder && !t.ruin; }
+    tileEmpty(t) { return !t.res && !t.imp && !t.city && !t.village && !t.wonder && !t.ruin && !t.fort; }
 
     countAdj(t, imp, owner) {
       let n = 0;
-      for (const nb of this.neighbors(t)) if (nb.imp === imp && (owner == null || nb.owner === owner)) n++;
+      for (const nb of this.neighbors(t)) if (nb.imp === imp && !nb.pillaged && (owner == null || nb.owner === owner)) n++;
       return n;
     }
 
     marketValue(t) {
       let v = 0;
-      for (const nb of this.neighbors(t)) if (nb.owner === t.owner && (nb.imp === 'sawmill' || nb.imp === 'windmill' || nb.imp === 'forge')) v += nb.impLevel;
+      for (const nb of this.neighbors(t)) if (nb.owner === t.owner && !nb.pillaged && (nb.imp === 'sawmill' || nb.imp === 'windmill' || nb.imp === 'forge')) v += nb.impLevel;
       return Math.min(8, v);
     }
 
@@ -649,21 +786,24 @@
       const a = PP.TILE_ACTION[id];
       const r = { ok: false, visible: false, reason: '', cost: a.cost };
       if (!p.explored[t.y * this.W + t.x] || t.city || t.village) return r;
+      if (a.tribe && p.tribe !== a.tribe) return r;
+      if (a.fort || a.repair) return this.fortActionCheck ? this.fortActionCheck(p, t, a, r) : r;
       if (a.road) {
         if (this.isWater(t) || t.road || t.terrain === 'mountain' || !(t.owner === p.id || t.owner === -1)) return r;
       } else if (t.owner !== p.id) return r;
       if (a.res && t.res !== a.res) return r;
       if (a.terrain && a.terrain.indexOf(t.terrain) < 0) return r;
       if (a.empty && !this.tileEmpty(t)) return r;
-      if (a.noImp && (t.imp || t.wonder)) return r;
+      if (a.noImp && (t.imp || t.wonder || t.fort)) return r;
       if (a.adj && this.countAdj(t, a.adj, p.id) === 0) return r;
       if (id === 'market' && !this.neighbors(t).some(n => n.owner === p.id && (n.imp === 'sawmill' || n.imp === 'windmill' || n.imp === 'forge'))) return r;
       if (a.unique && this.tiles.some(o => o.cityId === t.cityId && o.imp === a.imp)) return r;
       r.visible = true;
+      if (id === 'port' && t.landmark === 'porto_natural') r.cost = 0;
       const occ = this.uGrid[t.y * this.W + t.x];
       if (a.tech && !this.has(p, a.tech)) { r.reason = 'Requer ' + PP.TECH[a.tech].name; r.locked = true; return r; }
       if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-      if (p.stars < a.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
       r.ok = true;
       return r;
     }
@@ -682,7 +822,8 @@
       const chk = this.tileActionCheck(p, t, id);
       if (!chk.ok) return false;
       const a = PP.TILE_ACTION[id];
-      p.stars -= a.cost;
+      if (a.fort || a.repair) return this.doFortAction(p, t, a, chk);
+      p.stars -= chk.cost;
       const city = t.cityId ? this.cityMap[t.cityId] : null;
       if (a.consume) t.res = null;
       if (a.gold) p.stars += a.gold;
@@ -694,12 +835,13 @@
       if (a.road) t.road = true;
       let pop = a.pop || 0;
       if (id === 'fishing' && p.tribe === 'vikar') pop += 1;
+      if (id === 'port' && t.landmark === 'porto_natural') pop += 1;
       if (a.imp) {
-        t.imp = a.imp; t.res = null; t.impLevel = 0;
+        t.imp = a.imp; t.res = null; t.impLevel = 0; t.pillaged = false;
         if ((a.imp === 'mine' || a.imp === 'gemmine') && p.tribe === 'aymara') pop += 1;
         if (a.adj) { pop = this.countAdj(t, a.adj, p.id) * a.per; t.impLevel = pop; }
       }
-      if (city && city.owner === p.id && pop) this.addPop(city, pop);
+      if (city && city.owner === p.id && pop) this.addPop(city, this.popGain ? this.popGain(city, pop) : pop);
       const feed = { lumber: ['sawmill', 1], farm: ['windmill', 1], mine: ['forge', 2] }[a.imp];
       if (feed) {
         for (const nb of this.neighbors(t)) {
@@ -711,22 +853,25 @@
         }
       }
       p.stats.built++;
+      this.invalidate();
       this.emit('build', { player: p.id, tile: t, action: id });
-      this.updateVision(p);
+      this.refreshVision(p.id);
       return true;
     }
 
     // ============================================================ Maravilhas
+    wonderCostFor(p, wid) { return this.wonderCost ? this.wonderCost(p, wid) : PP.WONDERS[wid].cost; }
+
     wonderCheck(p, t, wid) {
       const w = PP.WONDERS[wid];
-      const r = { ok: false, visible: false, reason: '', cost: w.cost };
+      const r = { ok: false, visible: false, reason: '', cost: this.wonderCostFor(p, wid) };
       if (t.owner !== p.id || this.isWater(t) || !this.tileEmpty(t) || this.wonders[wid] != null) return r;
       if (!this.has(p, w.tech)) return r;
       if (w.coastal && !this.neighbors(t).some(n => this.isWater(n))) return r;
       r.visible = true;
       const occ = this.uGrid[t.y * this.W + t.x];
       if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-      if (p.stars < w.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
       r.ok = true;
       return r;
     }
@@ -741,9 +886,11 @@
     }
 
     buildWonder(p, t, wid) {
-      if (this.over || p.id !== this.current || !this.wonderCheck(p, t, wid).ok) return false;
+      if (this.over || p.id !== this.current) return false;
+      const chk = this.wonderCheck(p, t, wid);
+      if (!chk.ok) return false;
       const w = PP.WONDERS[wid];
-      p.stars -= w.cost;
+      p.stars -= chk.cost;
       t.wonder = wid;
       this.wonders[wid] = p.id;
       const city = this.cityMap[t.cityId];
@@ -754,22 +901,28 @@
       }
       if (wid === 'eye') p.explored.fill(1);
       this.log(`${p.name} construiu a maravilha ${w.name}!`, null);
+      this.hook('wonder', p, wid);
       this.emit('wonder', { player: p.id, tile: t, wonder: wid });
-      this.updateVision(p);
+      this.refreshVision(p.id);
+      this.checkVictory();
       return true;
     }
 
     // ============================================================ Construções de cidade
-    buildingCost(p, id) {
+    buildingCost(p, id, c) {
       const b = PP.BUILDINGS[id];
-      return id === 'walls' && this.has(p, 'arquitetura') ? Math.ceil(b.cost / 2) : b.cost;
+      let cost = b.cost;
+      if (id === 'walls' && this.has(p, 'arquitetura')) cost = Math.ceil(cost / 2);
+      if (id === 'granary' && c && c.spec === 'agricola') cost = Math.ceil(cost / 2);
+      return cost;
     }
 
     buildingCheck(p, c, id) {
       const b = PP.BUILDINGS[id];
-      const r = { ok: false, cost: this.buildingCost(p, id), reason: '' };
+      const r = { ok: false, cost: this.buildingCost(p, id, c), reason: '' };
       if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
-      if (c.buildings[id]) { r.reason = 'Construído'; r.done = true; return r; }
+      if (b.spec && c.spec !== b.spec) { r.reason = 'Exige cidade ' + PP.SPECS[b.spec].name; r.specLocked = true; if (!c.buildings[id]) return r; }
+      if (c.buildings[id]) { r.reason = b.spec && c.spec !== b.spec ? 'Inativa (outra especialização)' : 'Construído'; r.done = true; return r; }
       if (b.tech && !this.has(p, b.tech)) { r.reason = 'Requer ' + PP.TECH[b.tech].name; r.locked = true; return r; }
       if (b.needs && !c.buildings[b.needs]) { r.reason = 'Requer ' + PP.BUILDINGS[b.needs].name; return r; }
       if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
@@ -785,7 +938,9 @@
       c.buildings[id] = true;
       const b = PP.BUILDINGS[id];
       if (b.pop) this.addPop(c, b.pop);
+      p.stats.built++;
       this.emit('building', { player: p.id, city: c, building: id });
+      this.refreshVision(p.id);
       return true;
     }
 
@@ -806,7 +961,7 @@
       if (L === 2) return ['workshop', 'academy'];
       if (L === 3) return [c.buildings.walls ? 'scholars' : 'walls', 'resources', 'explorer'];
       if (L === 4) return ['growth', c.radius < 2 ? 'borders' : 'scholars'];
-      return ['park', 'giant'];
+      return this.milestoneOptions ? this.milestoneOptions(c) : ['park', 'giant'];
     }
 
     onLevelUp(c) {
@@ -856,9 +1011,11 @@
           else p.stars += 10;
           break;
         }
+        default:
+          if (this.applyMilestone) this.applyMilestone(c, r);
       }
       this.emit('reward', { city: c, reward: r });
-      this.updateVision(p);
+      this.refreshVision(p.id);
     }
 
     // ============================================================ Tecnologia
@@ -867,6 +1024,7 @@
       let c = PP.TECH_BASE[t.tier] + t.tier * 1.5 * Math.max(1, this.citiesOf(p.id).length);
       if (p.tribe === 'hanlu') c *= 0.9;
       if (this.has(p, 'filosofia')) c *= 0.85;
+      if (this.techCostMult) c *= this.techCostMult(p, id);
       return Math.max(1, Math.round(c));
     }
     allTechs(p) { return PP.TECHS.every(t => p.techs[t.id]); }
@@ -890,96 +1048,12 @@
       if (p.science < cost) return false;
       p.science -= cost;
       p.techs[id] = true;
+      this.hook('tech', p, id);
       this.emit('tech', { player: p.id, tech: id });
       return true;
     }
 
-    // ============================================================ Economia
-    updateConnections(p) {
-      const mine = this.citiesOf(p.id);
-      const cap = p.capital ? this.cityMap[p.capital] : null;
-      if (!cap || cap.owner !== p.id) { mine.forEach(c => { c.connected = false; }); return; }
-      const W = this.W, seen = new Uint8Array(W * this.H);
-      const start = cap.y * W + cap.x;
-      seen[start] = 1;
-      const q = [start];
-      while (q.length) {
-        const i = q.pop(), t = this.tiles[i];
-        const tWater = this.isWater(t);
-        for (const d of DIRS) {
-          const x = t.x + d[0], y = t.y + d[1];
-          if (!this.inb(x, y)) continue;
-          const j = y * W + x;
-          if (seen[j]) continue;
-          const n = this.tiles[j];
-          const nWater = this.isWater(n);
-          let ok = false;
-          if (n.imp === 'port') ok = true;
-          else if (!nWater && (n.road || n.city)) ok = !tWater || t.imp === 'port';
-          else if (nWater) ok = tWater;
-          if (ok) { seen[j] = 1; q.push(j); }
-        }
-      }
-      for (const c of mine) {
-        if (c === cap) continue;
-        const conn = !!seen[c.y * W + c.x];
-        if (conn && !c.connected) {
-          c.connected = true;
-          this.addPop(c, 1); this.addPop(cap, 1);
-          this.log(`${c.name} foi conectada à capital!`, p.id);
-          this.emit('connected', { city: c });
-        }
-        c.connected = conn;
-      }
-    }
-
-    cityIncome(c, tileIncome) {
-      const p = this.players[c.owner];
-      let stars = c.level + (c.capital ? 1 : 0) + c.workshop + c.parks + (c.buildings.bank ? 3 : 0);
-      if (p.tribe === 'qadir') stars += c.capital ? 2 : c.connected ? 1 : 0;
-      if (c.connected && !c.capital) stars += this.has(p, 'comercio') ? 2 : 1;
-      if (tileIncome == null) {
-        tileIncome = 0;
-        for (const t of this.tiles) if (t.cityId === c.id && t.owner === c.owner) tileIncome += this.tileIncome(t);
-      }
-      stars += tileIncome;
-      const sci = 1 + Math.floor(c.level / 2) + (c.capital ? 1 : 0) + c.academy +
-        (c.buildings.library ? 2 : 0) + (c.buildings.university ? 3 : 0);
-      return { stars, sci };
-    }
-
-    tileIncome(t) {
-      if (t.imp === 'gemmine' || t.imp === 'plantation') return 2;
-      if (t.imp === 'market') return this.marketValue(t);
-      return 0;
-    }
-
-    income(p) {
-      const byCity = {};
-      let ports = 0;
-      for (const t of this.tiles) {
-        if (t.owner !== p.id) continue;
-        if (t.imp === 'port') ports++;
-        const v = this.tileIncome(t);
-        if (v) byCity[t.cityId] = (byCity[t.cityId] || 0) + v;
-      }
-      let stars = 0, sci = 0;
-      for (const c of this.cities) {
-        if (c.owner !== p.id) continue;
-        const ci = this.cityIncome(c, byCity[c.id] || 0);
-        stars += ci.stars; sci += ci.sci;
-      }
-      if (this.wonders.pyramids === p.id) stars += 3;
-      if (this.wonders.colossus === p.id) stars += ports;
-      if (this.wonders.great_library === p.id) sci += 4;
-      if (this.wonders.oracle === p.id) sci += 2;
-      if (!p.human) {
-        const d = PP.DIFFICULTY[this.opts.difficulty] || PP.DIFFICULTY.normal;
-        stars += d.stars; sci += d.sci;
-      }
-      return { stars, sci };
-    }
-
+    // ============================================================ Pontuação e força
     score(p) {
       let s = 0;
       for (const c of this.cities) {
@@ -989,79 +1063,42 @@
       let terr = 0, expl = 0;
       for (let i = 0; i < this.tiles.length; i++) { if (this.tiles[i].owner === p.id) terr++; if (p.explored[i]) expl++; }
       s += terr * 5 + expl;
-      for (const id in p.techs) s += PP.TECH[id].tier * 30;
+      for (const id in p.techs) s += PP.TECH[id] ? PP.TECH[id].tier * 30 : 0;
       s += (p.future || 0) * 120;
       for (const u of this.units) if (u.owner === p.id) s += (UN[u.type].cost || 10) * 4;
       for (const w in this.wonders) if (this.wonders[w] === p.id) s += 500;
+      if (this.scoreExtras) s += this.scoreExtras(p);
       return Math.round(s);
     }
 
     strength(pid) {
       let s = 0;
-      for (const u of this.units) {
-        if (u.owner !== pid) continue;
+      const add = u => {
         const d = UN[u.type];
+        if (d.spy) return;
         s += (d.atk + d.def) * (u.hp / this.maxHp(u)) + d.cost * 0.3;
-      }
+      };
+      for (const u of this.units) if (u.owner === pid) add(u);
+      if (this.cargoUnits) for (const u of this.cargoUnits()) if (u.owner === pid) add(u);
       return s + this.citiesOf(pid).length * 2;
-    }
-
-    // ============================================================ Diplomacia
-    proposePeace(from, to) {
-      const a = this.players[from], b = this.players[to];
-      if (!a || !b || !a.alive || !b.alive || !a.met[to] || !this.atWar(from, to)) return 'invalid';
-      if (a.lastPeaceAsk[to] === this.turn) return 'wait';
-      a.lastPeaceAsk[to] = this.turn;
-      if (b.human) {
-        if (!b.proposals.some(pr => pr.from === from)) b.proposals.push({ from, turn: this.turn });
-        this.emit('proposal', { from, to });
-        return 'pending';
-      }
-      const ok = PP.AI ? PP.AI.evaluatePeace(this, b, a) : false;
-      if (ok) { this.makePeace(from, to); return 'accepted'; }
-      this.log(`${b.name} recusou a proposta de paz de ${a.name}.`, [from, to]);
-      return 'rejected';
-    }
-
-    respondProposal(p, from, accept) {
-      const i = p.proposals.findIndex(pr => pr.from === from);
-      if (i < 0) return false;
-      p.proposals.splice(i, 1);
-      if (accept && this.atWar(p.id, from)) this.makePeace(p.id, from);
-      else this.log(`${p.name} recusou a paz com ${this.players[from].name}.`, [p.id, from]);
-      return true;
-    }
-
-    makePeace(a, b) {
-      this.players[a].rel[b] = { state: 'peace', since: this.turn };
-      this.players[b].rel[a] = { state: 'peace', since: this.turn };
-      this.log(`${this.players[a].name} e ${this.players[b].name} assinaram a paz.`, null);
-      this.emit('diplomacy', { type: 'peace', a, b });
-    }
-
-    declareWar(a, b) {
-      if (!this.atPeace(a, b)) return false;
-      this.players[a].rel[b] = { state: 'war', since: this.turn };
-      this.players[b].rel[a] = { state: 'war', since: this.turn };
-      this.players[a].reputation -= 1;
-      this.log(`${this.players[a].name} declarou guerra a ${this.players[b].name}!`, null);
-      this.emit('diplomacy', { type: 'war', a, b });
-      return true;
     }
 
     // ============================================================ Turnos
     beginTurn() {
       const p = this.players[this.current];
-      p.proposals = p.proposals.filter(pr => this.turn - pr.turn <= 1 && this.atWar(pr.from, p.id) && this.players[pr.from].alive);
-      this.updateConnections(p);
+      this.invalidate();
+      this.hook('beforeTurn', p);
+      if (this.updateConnections) this.updateConnections(p);
       if (this.turn > 1) {
         const inc = this.income(p);
         p.stars += inc.stars; p.science += inc.sci;
+        this.hook('income', p, inc);
       }
       for (const u of this.units) {
         if (u.owner !== p.id) continue;
         u.mp = this.stat(u).move; u.canAttack = true; u.moved = false; u.attacked = false;
       }
+      this.hook('afterTurnStart', p);
       this.updateVision(p);
       this.emit('turnStart', { player: p.id, turn: this.turn });
     }
@@ -1070,18 +1107,25 @@
       if (this.over) return;
       const p = this.players[this.current];
       while (p.pendingRewards.length) this.chooseReward(p, p.pendingRewards[0].options[0]);
+      this.hook('endTurn', p);
       this.emit('turnEnd', { player: p.id });
       let n = this.current, guard = 0;
       do {
         n = (n + 1) % this.players.length;
-        if (n === 0) { this.turn++; this.recordHistory(); }
+        if (n === 0) {
+          this.turn++;
+          this.hook('newRound');
+          this.recordHistory();
+          if (this.over) return;
+        }
       } while (!this.players[n].alive && ++guard < 64);
       this.current = n;
-      if (this.opts.victory === 'pontos' && this.turn > this.opts.turnLimit) {
+      if (this.opts.victory === 'pontos' && this.turn > this.opts.turnLimit && !this.over) {
         const best = this.players.filter(q => q.alive).sort((a, b) => this.score(b) - this.score(a))[0];
         this.finish(best.id, 'pontos');
         return;
       }
+      if (this.over) return;
       this.beginTurn();
     }
 
@@ -1096,6 +1140,7 @@
       for (const u of this.units.slice()) if (u.owner === p.id) { this.units.splice(this.units.indexOf(u), 1); this.uGrid[u.y * this.W + u.x] = null; u.dead = true; }
       p.visible.fill(0);
       this.log(`${p.name} foi eliminado!`, null);
+      this.hook('eliminated', p);
       this.emit('eliminated', { player: p.id });
     }
 
@@ -1107,49 +1152,88 @@
       if (humans.length && !humans.some(p => p.alive)) {
         const best = alive.sort((a, b) => this.score(b) - this.score(a))[0];
         this.finish(best.id, 'derrota');
+        return;
       }
+      this.hook('checkVictory');
     }
 
     finish(winner, reason) {
       if (this.over) return;
       this.over = true; this.winner = winner; this.endReason = reason;
       this.recordHistory();
+      this.hook('gameover', winner, reason);
       this.emit('gameover', { winner, reason });
     }
 
     // ============================================================ Salvar / carregar
     toJSON() {
       const bits = a => { let s = ''; for (let i = 0; i < a.length; i++) s += a[i] ? '1' : '0'; return s; };
-      return {
-        v: 1, opts: this.opts, W: this.W, H: this.H, rng: this.rng.s, turn: this.turn, current: this.current,
+      const tileExtra = t => {
+        const x = {};
+        if (t.fort) x.f = t.fort;
+        if (t.landmark) x.l = t.landmark;
+        if (t.pillaged) x.p = 1;
+        if (t.ruinType) x.r = t.ruinType;
+        if (t.shrine != null && t.shrine !== -1) x.s = t.shrine;
+        return Object.keys(x).length ? x : 0;
+      };
+      const plainPlayer = p => {
+        const o = {};
+        for (const k in p) {
+          const v = p[k];
+          if (k === 'visible') continue;
+          if (k === 'explored') { o.explored = bits(v); continue; }
+          if (v && typeof v === 'object' && ArrayBuffer.isView(v)) continue; // arrays tipados são salvos pelos sistemas
+          o[k] = v;
+        }
+        return o;
+      };
+      const data = {
+        v: SAVE_VERSION, opts: this.opts, W: this.W, H: this.H, rng: this.rng.s, turn: this.turn, current: this.current,
         nextId: this.nextId, wonders: this.wonders, over: this.over, winner: this.winner, endReason: this.endReason,
         logs: this.logs.slice(-120), history: this.history,
-        tiles: this.tiles.map(t => [t.terrain, t.biome, t.res || 0, t.imp || 0, t.impLevel, t.road ? 1 : 0, t.owner, t.cityId, t.city, t.village ? 1 : 0, t.ruin ? 1 : 0, t.wonder || 0]),
+        tiles: this.tiles.map(t => [t.terrain, t.biome, t.res || 0, t.imp || 0, t.impLevel, t.road ? 1 : 0, t.owner, t.cityId, t.city, t.village ? 1 : 0, t.ruin ? 1 : 0, t.wonder || 0, tileExtra(t)]),
         units: this.units, cities: this.cities,
-        players: this.players.map(p => Object.assign({}, p, { explored: bits(p.explored), visible: undefined })),
+        players: this.players.map(plainPlayer),
+        sys: {},
       };
+      this.hook('save', data.sys);
+      return data;
     }
 
     static fromJSON(d) {
       const g = new Game();
-      g.opts = d.opts; g.W = d.W; g.H = d.H; g.rng = new PP.RNG(1); g.rng.s = d.rng;
+      g.opts = Object.assign({}, d.opts);
+      if (!g.opts.scenario) g.opts.scenario = 'normal';
+      g.W = d.W; g.H = d.H; g.rng = new PP.RNG(1); g.rng.s = d.rng;
       g.turn = d.turn; g.current = d.current; g.nextId = d.nextId; g.wonders = d.wonders || {};
       g.over = d.over; g.winner = d.winner; g.endReason = d.endReason; g.logs = d.logs || []; g.history = d.history || [];
       g.usedNames = {};
-      g.tiles = d.tiles.map((a, i) => ({
-        x: i % d.W, y: (i / d.W) | 0, terrain: a[0], biome: a[1], res: a[2] || null, imp: a[3] || null, impLevel: a[4],
-        road: !!a[5], owner: a[6], cityId: a[7], city: a[8], village: !!a[9], ruin: !!a[10], wonder: a[11] || null,
-      }));
+      g.tiles = d.tiles.map((a, i) => {
+        const x = a[12] || {};
+        return {
+          x: i % d.W, y: (i / d.W) | 0, terrain: a[0], biome: a[1], res: a[2] || null, imp: a[3] || null, impLevel: a[4],
+          road: !!a[5], owner: a[6], cityId: a[7], city: a[8], village: !!a[9], ruin: !!a[10], wonder: a[11] || null,
+          fort: x.f || null, landmark: x.l || null, pillaged: !!x.p, ruinType: x.r || null, shrine: x.s != null ? x.s : -1,
+        };
+      });
       g.units = d.units; g.cities = d.cities;
       g.players = d.players.map(p => {
         const q = Object.assign({}, p);
         q.explored = new Uint8Array(d.W * d.H);
         for (let i = 0; i < p.explored.length; i++) q.explored[i] = p.explored.charCodeAt(i) === 49 ? 1 : 0;
         q.visible = new Uint8Array(d.W * d.H);
+        if (!q.stats) q.stats = { kills: 0, losses: 0, captured: 0, built: 0 };
+        if (!q.proposals) q.proposals = [];
+        if (!q.pendingRewards) q.pendingRewards = [];
+        if (!q.lastPeaceAsk) q.lastPeaceAsk = {};
         return q;
       });
+      g.saveVersion = d.v || 1;
+      g.hook('load', d.sys || {}, d);
       g.rebuildIndex();
       g.players.forEach(p => g.updateVision(p));
+      g.hook('ready');
       return g;
     }
   }
@@ -1157,4 +1241,5 @@
   PP.Game = Game;
   PP.cheb = cheb;
   PP.DIRS = DIRS;
+  PP.SAVE_VERSION = SAVE_VERSION;
 })(typeof globalThis !== 'undefined' ? (globalThis.PP = globalThis.PP || {}) : (window.PP = window.PP || {}));

@@ -1,6 +1,6 @@
 // Simulação headless: partidas IA x IA para validar regras e IA.
 // Uso: node tests/sim.js [partidas] [turnos]
-require('../js/util.js'); require('../js/data.js'); require('../js/mapgen.js'); require('../js/game.js'); require('../js/ai.js');
+require('./load.js');
 const PP = globalThis.PP;
 
 async function play(seed, opts) {

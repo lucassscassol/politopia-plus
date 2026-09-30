@@ -11,7 +11,9 @@
     const W = {
       workshop: 1.3, academy: 0.9 * p.ai.sci, walls: threat > 0 ? 4 : 0.4, scholars: 1, resources: 1.2,
       explorer: g.turn < 12 ? 1.2 : 0.2, growth: 1.4, borders: 1, park: 1 / p.ai.aggr, giant: 1.4 * p.ai.aggr,
+      metropolis: 3.5,
     };
+    for (const o of options) if (/^m_/.test(o)) W[o] = 3;
     return g.rng.weighted(options.map(o => [o, W[o] || 1]));
   };
 
@@ -43,6 +45,16 @@
     return g.rng.next() < PP.clamp(chance, 0.05, 0.9);
   };
 
+  // Propostas diplomáticas e ruínas: decididas pelo módulo de estratégia (ai-strategy.js)
+  AI.evaluateProposal = function (g, ai, from, type, data) {
+    if (PP.AIStrategy) return PP.AIStrategy.evaluateProposal(g, ai, from, type, data);
+    return type === 'peace' ? AI.evaluatePeace(g, ai, from) : false;
+  };
+
+  AI.chooseRuin = function (g, p, u, t, options) {
+    return PP.AIStrategy ? PP.AIStrategy.chooseRuin(g, p, u, t, options) : 'explore';
+  };
+
   AI.cityThreat = function (g, p, c) {
     let t = 0;
     for (const e of g.units) {
@@ -56,21 +68,27 @@
   AI.takeTurn = async function (g, hooks) {
     const p = g.currentPlayer;
     const pause = (hooks && hooks.pause) || (() => null);
-    const ctx = new Ctx(g, p);
+    const analysis = PP.AIStrategy ? PP.AIStrategy.updateStrategy(g, p) : null;
+    const ctx = new Ctx(g, p, analysis);
     ctx.diplomacy();
+    ctx.project();
     ctx.research();
+    ctx.specialize();
     await ctx.unitPhase(pause);
     if (g.over) return;
     ctx.refresh();
     ctx.spend();
+    ctx.project();
     ctx.research();
   };
 
   class Ctx {
-    constructor(g, p) {
+    constructor(g, p, analysis) {
       this.g = g; this.p = p; this.W = g.W;
+      this.analysis = analysis || null;
+      this.strategy = p.ai.strategy || null;
       this.diff = PP.DIFFICULTY[g.opts.difficulty] || PP.DIFFICULTY.normal;
-      this.aggr = p.ai.aggr * this.diff.aggr;
+      this.aggr = p.ai.aggr * this.diff.aggr * (PP.AIStrategy ? PP.AIStrategy.aggrMult(p) : 1);
       this.smart = this.diff.smart;
       this.revCache = new Map();
       this.claims = new Map();
@@ -130,6 +148,7 @@
     // ---------------------------------------------------------- Diplomacia
     diplomacy() {
       const g = this.g, p = this.p;
+      if (PP.AIStrategy && this.analysis) { PP.AIStrategy.diplomacy(g, p, this.analysis); return; }
       const myS = g.strength(p.id);
       for (const q of g.players) {
         if (q.id === p.id || !q.alive || !p.met[q.id]) continue;
@@ -156,6 +175,7 @@
     // ---------------------------------------------------------- Pesquisa
     research() {
       const g = this.g, p = this.p;
+      if (this.savingForProject()) return;
       for (let guard = 0; guard < 6; guard++) {
         const avail = PP.TECHS.filter(t => g.techState(p, t.id) === 'available');
         if (!avail.length) {
@@ -164,12 +184,55 @@
         }
         let best = null, bv = -1;
         for (const t of avail) {
-          const v = this.techValue(t) / g.techCost(p, t.id) * (0.8 + g.rng.next() * 0.4);
+          const v = this.techValue(t) * this.techStrategyMult(t) / g.techCost(p, t.id) * (0.8 + g.rng.next() * 0.4);
           if (v > bv) { bv = v; best = t; }
         }
         if (!best || p.science < g.techCost(p, best.id)) return;
         g.research(p, best.id);
       }
+    }
+
+    // Guarda ciência para o Grande Observatório quando a vitória científica está ao alcance
+    savingForProject() {
+      const g = this.g, p = this.p;
+      if (!g.projectCheck || !g.victoryEnabled('ciencia')) return false;
+      const sciCity = this.cities.find(c => c.spec === 'ciencia');
+      if (!sciCity) return false;
+      const chk = g.projectCheck(p, sciCity);
+      if (chk.ok) return true;
+      const ready = !chk.locked && chk.reason === 'Falta ciência';
+      return ready && (this.strategy === 'ciencia' || g.allTechs(p) || p.project.stage > 0);
+    }
+
+    project() {
+      const g = this.g, p = this.p;
+      if (!g.projectCheck) return;
+      for (const c of this.cities) {
+        if (g.projectCheck(p, c).ok) { g.advanceProject(p, c); return; }
+      }
+    }
+
+    // Escolhe especializações quando a cidade atinge o nível mínimo
+    specialize() {
+      const g = this.g, p = this.p;
+      if (!PP.AIStrategy || !g.specCheck) return;
+      for (const c of this.cities) {
+        if (c.spec || c.level < PP.SPEC_COST.minLevel || p.stars < PP.SPEC_COST.first + 3) continue;
+        const spec = PP.AIStrategy.chooseSpec(g, p, c);
+        if (spec) g.setSpec(p, c, spec);
+      }
+    }
+
+    techStrategyMult(t) {
+      const m = {
+        dominacao: { estrategia: 1.3, forja: 1.3, cavalaria: 1.3, polvora: 1.4, matematica: 1.2, arco: 1.2 },
+        ciencia: { escrita: 1.6, filosofia: 1.5, educacao: 1.8, meditacao: 1.2, espionagem: 1.1 },
+        economia: { estradas: 1.4, comercio: 1.6, economia: 1.5, navegacao: 1.3, cartografia: 1.2 },
+        diplomacia: { escrita: 1.3, filosofia: 1.3, comercio: 1.2, espionagem: 1.2 },
+        territorial: { estradas: 1.3, agricultura: 1.3, construcao: 1.2, arquitetura: 1.3, estrategia: 1.1 },
+        defesa: { estrategia: 1.8, arquitetura: 1.4, mineracao: 1.2, arco: 1.3 },
+      }[this.strategy];
+      return (m && m[t.id]) || 1;
     }
 
     techValue(t) {
@@ -203,6 +266,7 @@
         case 'educacao': return 3 + sci * 2.5;
         case 'economia': return 5;
         case 'arquitetura': return 3.5;
+        case 'espionagem': return 1.5 + (this.analysis && this.analysis.wars ? 1.5 : 0) + (this.strategy === 'ciencia' ? 1 : 0);
       }
       return 2;
     }
@@ -213,6 +277,7 @@
       const order = u => {
         if (g.canCapture(u)) return 0;
         const d = UN[u.type];
+        if (d.spy) return 4;
         if (d.range > 1) return 1;
         if (d.skills.indexOf('convert') >= 0) return 3;
         return 2;
@@ -284,11 +349,16 @@
       const g = this.g;
       if (u.pendingPromo) AI.autoPromote(g, u);
       const thr = this.attackThreshold();
+      if (UN[u.type].spy) { await this.actSpy(u, pause); return; }
 
       // 1) Capturar
       if (g.canCapture(u)) { g.capture(u); await pause('capture', u); return; }
 
       const st = g.stat(u);
+
+      // 1b) Habilidades que preparam o ataque (tiro preciso, bombardeio, carga, bordada, bênção, reconhecimento)
+      this.preAbilities(u);
+      if (u.dead || g.over) return;
 
       // 2) Missionário: converter / curar
       if (st.skills.convert) {
@@ -312,9 +382,16 @@
         return;
       }
 
-      // 4) Muito ferido: recuar e curar
+      // 3b) Saquear a infraestrutura inimiga onde está
+      if (g.pillageCheck) {
+        const pc = g.pillageCheck(u);
+        if (pc.ok && (pc.what !== 'road' || this.aggr > 1.1)) { g.pillage(u); await pause('pillage', u); return; }
+      }
+
+      // 4) Muito ferido (ou sem suprimentos há muito tempo): recuar e curar
       const hpFrac = u.hp / st.maxHp;
-      if (hpFrac < 0.45 && !this.inOwnCity(u)) {
+      const starving = g.supplyLevel && g.supplyLevel(u) >= 2 && hpFrac < 0.8;
+      if ((hpFrac < 0.45 || starving) && !this.inOwnCity(u)) {
         const home = this.nearestSafeCity(u);
         if (home && u.mp > 0 && this.stepToward(u, { idx: home.y * this.W + home.x, kind: 'retreat' })) { await pause('move', u); return; }
         if (g.canRecover(u)) { g.recover(u); return; }
@@ -351,9 +428,94 @@
         const t = g.tileAt(u);
         const garrison = t.city && (this.threats[t.city] > 0 || (this.claims.get(u.y * this.W + u.x) || 0) > 0);
         if (this.inOwnCity(u) && !garrison && u.mp > 0 && this.leaveCity(u)) { await pause('move', u); return; }
+        if (this.defensiveAbility(u)) return;
         if (g.canRecover(u)) g.recover(u);
         else if (this.inOwnCity(u) && g.canFortify(u)) g.fortify(u);
       }
+    }
+
+    unknownNear(u, r) {
+      let n = 0;
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const x = u.x + dx, y = u.y + dy;
+        if (this.g.inb(x, y) && !this.p.explored[y * this.W + x]) n++;
+      }
+      return n;
+    }
+
+    preAbilities(u) {
+      const g = this.g;
+      if (!g.abilitiesOf) return;
+      const list = g.abilitiesOf(u);
+      if (!list.length) return;
+      const st = g.stat(u);
+      for (const id of list) {
+        if (u.dead || !g.abilityCheck(u, id).ok) continue;
+        if (id === 'recon') {
+          if (this.unknownNear(u, 4) >= 5) g.useAbility(u, id);
+        } else if (id === 'aim') {
+          if (g.attackTargets(u).length || this.enemies.some(e => cheb(e, u) === st.range + 1)) g.useAbility(u, id);
+        } else if (id === 'bombard') {
+          if (this.enemies.some(e => cheb(e, u) <= st.range + 1 && this.enemies.some(o => o !== e && cheb(o, e) === 1))) g.useAbility(u, id);
+        } else if (id === 'charge') {
+          if (!g.attackTargets(u).length && this.aggr >= 0.8 && u.hp > st.maxHp * 0.6 &&
+            this.enemies.some(e => cheb(e, u) > st.move && cheb(e, u) <= st.move + 3)) g.useAbility(u, id);
+        } else if (id === 'broadside') {
+          if (g.broadsideTargets(u).length >= 2) g.useAbility(u, id);
+        } else if (id === 'bless') {
+          const friends = g.neighbors(u).filter(n => { const o = g.uGrid[n.y * this.W + n.x]; return o && o.owner === u.owner; }).length;
+          if (friends >= 2 && this.enemies.some(e => cheb(e, u) <= 3)) g.useAbility(u, id);
+        }
+      }
+    }
+
+    // Provocar / Formação Cerrada quando a unidade vai ficar parada perto do inimigo
+    defensiveAbility(u) {
+      const g = this.g;
+      if (!g.abilitiesOf) return false;
+      const near = this.enemies.filter(e => cheb(e, u) <= 2).length;
+      if (!near) return false;
+      const friends = g.neighbors(u).filter(n => { const o = g.uGrid[n.y * this.W + n.x]; return o && o.owner === u.owner; }).length;
+      for (const id of g.abilitiesOf(u)) {
+        if (!g.abilityCheck(u, id).ok) continue;
+        if (id === 'taunt' && near >= 2 && friends >= 1 && u.hp >= g.maxHp(u) * 0.6) { g.useAbility(u, id); return true; }
+        if (id === 'phalanx' && friends >= 2) { g.useAbility(u, id); return true; }
+      }
+      return false;
+    }
+
+    // Espiões: missão se estiver ao lado de uma cidade estrangeira; senão, aproxima-se de uma
+    async actSpy(u, pause) {
+      const g = this.g, p = this.p;
+      const ms = g.spyMissions(u).filter(m => m.ok);
+      if (ms.length) {
+        const victim = ms[0].target.owner;
+        const war = g.atWar(p.id, victim);
+        let pref = war ? ['sabotage_city', 'steal_tech', 'steal_sci', 'infiltrate', 'reveal'] : ['steal_tech', 'infiltrate', 'steal_sci', 'reveal'];
+        if (this.strategy === 'ciencia') pref = ['steal_tech', 'steal_sci', 'infiltrate', 'sabotage_city', 'reveal'];
+        for (const id of pref) {
+          const m = ms.find(x => x.id === id);
+          if (m && m.risk <= 0.55) { g.spyMission(u, id); await pause('spy', u); return; }
+        }
+      }
+      if (u.mp <= 0) return;
+      let target = null, bd = 1e9;
+      for (const c of g.cities) {
+        if (c.owner === p.id || g.allied(p.id, c.owner) || !p.explored[c.y * this.W + c.x] || !p.met[c.owner]) continue;
+        const d = cheb(c, u) - (g.atWar(p.id, c.owner) ? 3 : 0) - (c.owner === p.ai.target ? 2 : 0);
+        if (d < bd) { bd = d; target = c; }
+      }
+      if (!target) { const goal = this.chooseGoal(u); if (goal && goal.kind === 'explore' && this.stepToward(u, goal)) await pause('move', u); return; }
+      const reach = g.reachable(u);
+      let best = null, bs = cheb(u, target) === 1 ? 0 : 1e9;
+      for (const [k] of reach) {
+        const t = g.tiles[k];
+        if (t.city) continue;
+        const d = cheb(t, target);
+        const s = (d === 1 ? 0 : d * 3) + this.danger[k] * 0.5;
+        if (s < bs) { bs = s; best = k; }
+      }
+      if (best != null) { g.moveUnit(u, best % this.W, (best / this.W) | 0, reach); await pause('move', u); }
     }
 
     // Sai da cidade para uma casa vizinha segura (libera o espaço para treinar)
@@ -385,10 +547,11 @@
     // ---------------------------------------------------------- Navegação multi-turno
     stepOk(u, from, to) {
       const g = this.g, p = this.p;
-      const tw = g.isWater(to), fw = g.isWater(from);
+      if (UN[u.type].naval) return g.isWater(to) && (to.terrain !== 'ocean' || g.navalLevel(p) >= 2);
+      const tw = g.isWater(to) && to.landmark !== 'vau', fw = g.isWater(from) && from.landmark !== 'vau';
       if (tw) {
         const nl = g.navalLevel(p);
-        if (!fw) return to.imp === 'port' && to.owner === p.id && nl >= 1;
+        if (!fw) return ((to.imp === 'port' && to.owner === p.id) || (p.tribe === 'vikar' && to.terrain === 'water')) && nl >= 1;
         return nl >= 1 && (to.terrain !== 'ocean' || nl >= 2);
       }
       if (to.terrain === 'mountain' && (!p.techs.escalada || UN[u.type].mounted)) return false;
@@ -478,21 +641,28 @@
       for (let i = 0; i < g.tiles.length; i++) {
         if (!p.explored[i]) continue;
         const t = g.tiles[i];
-        if (t.village) push(i, isScout ? 8 : 10, 'village', 1);
+        if (t.village) push(i, (isScout ? 8 : 10) * (this.strategy === 'territorial' ? 1.3 : 1), 'village', 1);
         else if (t.ruin) push(i, 7, 'ruin', 1);
         else if (t.city) {
           const c = g.cityMap[t.city];
           if (c.owner !== p.id && g.atWar(p.id, c.owner) && p.met[c.owner] && !isScout) {
             const occ = g.uGrid[i];
-            const v = (6 + c.level) * this.aggr * ratio[c.owner] * (occ ? 0.6 : 1.2) * (defensive ? 0.5 : 1);
+            let v = (6 + c.level) * this.aggr * ratio[c.owner] * (occ ? 0.6 : 1.2) * (defensive ? 0.5 : 1);
+            if (p.ai.campaign && p.ai.campaign.city === c.id) v *= 2.2;
+            if (this.strategy === 'defesa') v *= 0.3;
             push(i, v, 'city', 8);
           }
+        } else if (!isScout && !defensive && d0.range === 1 && t.owner >= 0 && t.owner !== p.id && g.atWar(p.id, t.owner)) {
+          if (t.fort && t.fort.owner !== p.id) push(i, 2.5 * this.aggr, 'pillage', 1);
+          else if (t.imp && !t.pillaged) push(i, 1.4 * this.aggr, 'pillage', 1);
         }
       }
-      // defender cidades ameaçadas
+      // defender cidades ameaçadas e guarnecer cidades ocupadas ou em resistência
       for (const c of this.cities) {
         const th = this.threats[c.id];
-        if (th > 0) push(c.y * W + c.x, 6 + th * 2 * (defensive ? 1.5 : 1), 'defend', 2);
+        const dm = this.strategy === 'defesa' ? 1.5 : 1;
+        if (th > 0) push(c.y * W + c.x, (6 + th * 2 * (defensive ? 1.5 : 1)) * dm, 'defend', 2);
+        else if ((c.occupied > 0 || c.unrest) && !g.unitAt(c.x, c.y)) push(c.y * W + c.x, 5, 'garrison', 1);
         else if (defensive && !g.unitAt(c.x, c.y) && this.enemies.length) push(c.y * W + c.x, 3, 'garrison', 1);
       }
       // caçar inimigos visíveis
@@ -573,8 +743,13 @@
       for (const t of g.tiles) {
         if (t.owner !== p.id || t.city) continue;
         const city = g.cityMap[t.cityId];
+        if (t.pillaged) {
+          const chk = g.tileActionCheck(p, t, 'repair');
+          if (chk.visible && (chk.ok || chk.reason === 'Faltam estrelas')) out.push({ score: 1.6 / (chk.cost + 1) * eco, cost: chk.cost, exec: () => g.doTileAction(p, t, 'repair') });
+          continue;
+        }
         for (const a of PP.TILE_ACTIONS) {
-          if (a.road || a.id === 'clear' || a.id === 'plant') continue;
+          if (a.road || a.fort || a.repair || a.id === 'clear' || a.id === 'plant') continue;
           const chk = g.tileActionCheck(p, t, a.id);
           if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
           let v = 0;
@@ -588,10 +763,11 @@
           if (a.income) v += a.income * 1.3;
           if (a.id === 'market') v = g.neighbors(t).reduce((s, n) => s + (n.owner === p.id && ['sawmill', 'windmill', 'forge'].indexOf(n.imp) >= 0 ? n.impLevel : 0), 0) * 1.2;
           if (a.gold) v += a.gold * 0.45;
-          if (a.id === 'port') v += this.needsBoats ? 5 : 0.3;
+          if (a.id === 'port') v += this.needsBoats && !g.tiles.some(o => o.cityId === t.cityId && o.imp === 'port') ? 5 : 0.3;
           if (a.id === 'burn' || a.id === 'drain') v = 0.8;
           if (a.imp === 'mine' && !g.hasStrategic(p, 'iron')) v += 1;
           if (a.imp === 'pasture' && !g.hasStrategic(p, 'horses')) v += 0.8;
+          if (a.imp && PP.LUXURIES && Object.keys(PP.LUXURIES).some(k => PP.LUXURIES[k].imp === a.imp) && !(g.resourceAccess(p)[t.res] > 0)) v += 0.8;
           if (v <= 0) continue;
           const cost = a.cost;
           out.push({ score: v / (cost + 1) * eco, cost, exec: () => g.doTileAction(p, t, a.id) });
@@ -599,34 +775,85 @@
       }
       // Estradas até a capital
       const road = this.roadStep();
-      if (road) out.push({ score: 0.18 * eco, cost: 2, exec: () => g.doTileAction(p, road, 'road') });
+      if (road) out.push({ score: (this.strategy === 'economia' ? 0.28 : 0.18) * eco, cost: 2, exec: () => g.doTileAction(p, road, 'road') });
+      // Rotas comerciais
+      if (g.routeSlots) {
+        for (const c of this.cities) {
+          if (g.routesOf(c).length >= g.routeSlots(c)) continue;
+          const best = g.routeCandidates(p, c).find(x => x.yield && (x.check.ok || x.check.reason === 'Faltam estrelas') &&
+            (x.city.owner === p.id || g.opinion(p.id, x.city.owner) > -15));
+          if (!best) continue;
+          const val = best.yield.stars + best.yield.sci * 0.8 + (best.check.kind === 'foreign' ? 0.6 : 0);
+          const m = this.strategy === 'economia' ? 1.6 : this.strategy === 'diplomacia' ? 1.2 : 1;
+          out.push({ score: val * 0.9 * m / (best.check.cost + 1), cost: best.check.cost, exec: () => !!g.createRoute(p, c, best.city) });
+        }
+      }
+      // Fortificações: passos de montanha e casas-chave perto de cidades ameaçadas
+      if (g.fortActionCheck && (g.has(p, 'estrategia') || g.has(p, 'estradas'))) {
+        const cand = [];
+        for (const t of g.tiles) {
+          if (t.owner !== p.id || t.city || t.fort) continue;
+          let v = 0;
+          if (t.landmark === 'passo') v += 1.6;
+          const near = this.cities.find(c => cheb(c, t) === 2 && (this.threats[c.id] || 0) > 0);
+          if (near) v += 0.8 + Math.min(1.5, this.threats[near.id] * 0.15);
+          if (t.terrain === 'hills') v += 0.3;
+          if (this.strategy === 'defesa' || this.strategy === 'territorial') v *= 1.4;
+          if (v > 0.9) cand.push([t, v]);
+        }
+        cand.sort((a, b) => b[1] - a[1]);
+        for (const [t, v] of cand.slice(0, 2)) {
+          for (const id of ['fort', 'tower', 'outpost']) {
+            const chk = g.tileActionCheck(p, t, id);
+            if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
+            out.push({ score: v / (chk.cost + 1), cost: chk.cost, exec: () => g.doTileAction(p, t, id) });
+            break;
+          }
+        }
+      }
       // Construções
       for (const c of this.cities) {
         const th = this.threats[c.id] || 0;
         for (const id of PP.BUILDING_ORDER) {
           const chk = g.buildingCheck(p, c, id);
-          if (chk.done || chk.locked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
+          if (chk.done || chk.locked || chk.specLocked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
           let v = 0;
+          const strat = this.strategy;
           switch (id) {
-            case 'walls': v = th > 0 && c.level >= 2 ? 3 + th * 0.5 : (c.capital && g.turn > 20 ? 0.8 : 0); break;
+            case 'walls': v = th > 0 && c.level >= 2 ? 3 + th * 0.5 : (c.capital && g.turn > 20 ? 0.8 : 0); if (strat === 'defesa') v *= 2; break;
             case 'barracks': v = this.aggr > 1 && this.cities.length >= 3 ? 1.2 : 0.3; break;
             case 'granary': v = this.popValue(c, 2); break;
             case 'library': v = 2.2 * p.ai.sci; break;
-            case 'temple': v = this.popValue(c, 1) + 0.4; break;
+            case 'temple': v = this.popValue(c, 1) + 0.4 + (c.unrest || c.occupied ? 1.5 : 0); break;
             case 'university': v = 3.2 * p.ai.sci; break;
             case 'bank': v = 3.6; break;
+            case 'guard': v = (this.analysis && this.analysis.wars ? 0.6 : 0.2) + (c.capital ? 0.4 : 0) + (c.unrest ? 0.6 : 0); break;
+            case 'arsenal': v = 1.4 * this.aggr; break;
+            case 'citadel': v = th > 0 ? 3 : 0.8; if (strat === 'defesa') v *= 1.5; break;
+            case 'observatory': v = 2.0 * p.ai.sci; break;
+            case 'academy_hall': v = 2.8 * p.ai.sci; break;
+            case 'guild': v = 2.4; break;
+            case 'exchange': v = 3.2; break;
+            case 'silos': v = 1.2; break;
+            case 'aqueduct': v = this.popValue(c, 2) + 0.5; break;
+            case 'shipyard': v = this.needsBoats ? 1.5 : 0.6; break;
+            case 'lighthouse': v = 0.8; break;
+            case 'customs': v = 2.5; break;
           }
+          if (strat === 'ciencia' && ['library', 'university', 'observatory', 'academy_hall'].indexOf(id) >= 0) v *= 1.4;
+          if (strat === 'economia' && ['bank', 'guild', 'exchange', 'customs'].indexOf(id) >= 0) v *= 1.4;
           if (v > 0) out.push({ score: v / (chk.cost + 1), cost: chk.cost, exec: () => g.build(p, c, id) });
         }
       }
       // Maravilhas
       if (!this.anyThreat) {
+        const wm = g.victoryEnabled && g.victoryEnabled('maravilhas') ? 1.4 : 1;
         for (const wid in PP.WONDERS) {
           if (g.wonders[wid] != null || !g.has(p, PP.WONDERS[wid].tech)) continue;
           const spot = g.tiles.find(t => t.owner === p.id && g.wonderCheck(p, t, wid).visible);
           if (!spot) continue;
-          const w = PP.WONDERS[wid];
-          out.push({ score: 4.5 / (w.cost + 1), cost: w.cost, exec: () => g.buildWonder(p, spot, wid) });
+          const cost = g.wonderCostFor(p, wid);
+          out.push({ score: 4.5 * wm * (this.strategy === 'economia' ? 1.2 : 1) / (cost + 1), cost, exec: () => g.buildWonder(p, spot, wid) });
         }
       }
       // Unidades
@@ -635,30 +862,49 @@
       let base = deficit > 0 ? 0.36 + 0.07 * Math.min(6, deficit) : 0.06;
       if (this.anyThreat) base += 0.5;
       if (g.turn <= 3 && this.army < 2) base += 0.25;
+      if (this.strategy === 'dominacao') base *= 1.15;
+      if (this.strategy === 'defesa' && this.anyThreat) base += 0.3;
       for (const c of this.cities) {
-        if (g.unitAt(c.x, c.y)) continue;
         if (g.cityUnits(c).length >= g.capacity(c)) continue;
-        const type = this.chooseUnitType(c);
+        const occupied = !!g.unitAt(c.x, c.y);
+        const type = this.chooseUnitType(c, occupied);
         if (!type) continue;
-        const d = UN[type];
         const th = this.threats[c.id] || 0;
-        out.push({ score: base + (th > 0 ? 0.3 : 0), cost: d.cost, exec: () => !!g.train(p, c, type) });
+        out.push({ score: base + (th > 0 ? 0.3 : 0), cost: g.unitCostFor(p, c, type), exec: () => !!g.train(p, c, type) });
+      }
+      // Espiões (poucos, quando há guerras ou foco em ciência)
+      if (g.has(p, 'espionagem')) {
+        const spies = g.unitsOf(p.id).filter(u => UN[u.type].spy).length;
+        const want = (this.analysis && this.analysis.wars) || this.strategy === 'ciencia' ? Math.min(2, 1 + Math.floor(this.cities.length / 4)) : 0;
+        if (spies < want) {
+          const c = this.cities.find(x => !g.unitAt(x.x, x.y) && g.trainCheck(p, x, 'spy').reason !== 'Capacidade máxima');
+          if (c) out.push({ score: 0.3, cost: g.unitCostFor(p, c, 'spy'), exec: () => !!g.train(p, c, 'spy') });
+        }
       }
       return out;
     }
 
-    chooseUnitType(c) {
+    chooseUnitType(c, navalOnly) {
       const g = this.g, p = this.p;
       const th = this.threats[c.id] || 0;
       const mountedEnemies = this.enemies.some(e => UN[e.type].mounted);
-      const scouts = g.unitsOf(p.id).filter(u => u.type === 'scout').length;
+      const enemyShips = this.enemies.some(e => UN[e.type].naval);
+      const mine = g.unitsOf(p.id);
+      const scouts = mine.filter(u => u.type === 'scout').length;
+      const ships = mine.filter(u => UN[u.type].naval).length;
+      const navalWant = (this.needsBoats ? 1.5 : 0) + (enemyShips ? 1.5 : 0) + (this.strategy === 'economia' ? 0.3 : 0);
       const W = {
         warrior: 1, scout: g.turn < 18 && scouts < 1 ? 2.5 : 0, rider: 2 * this.aggr, archer: 1.8 + (th ? 1 : 0),
         defender: th ? 4 : 1, pikeman: mountedEnemies ? 3 : 1, swordsman: 3 * this.aggr, catapult: 1.3 * this.aggr,
         knight: 3.5 * this.aggr, missionary: 0.5, musketeer: 4, cannon: 1.5 * this.aggr,
+        spy: 0, transport: 0,
+        scout_ship: navalWant > 0 && ships < 1 ? 1.2 : 0, frigate: navalWant * (ships < 4 ? 1 : 0.3), ironclad: navalWant * 1.3,
       };
+      if (this.strategy === 'defesa') { W.defender *= 1.8; W.archer *= 1.4; W.pikeman *= 1.3; }
       const opts = [];
       for (const t of PP.TRAINABLE) {
+        if (navalOnly && !UN[t].naval) continue;
+        if (!W[t] && W[t] !== undefined) continue;
         const chk = g.trainCheck(p, c, t);
         if (!chk.ok && chk.reason !== 'Faltam estrelas') continue;
         const d = UN[t];
