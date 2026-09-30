@@ -1,0 +1,11 @@
+{
+  "name": "politopia-plus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jogo de estratégia por turnos inspirado em Polytopia, em HTML/JS puro.",
+  "scripts": {
+    "start": "npx --yes http-server -p 8080 -c-1 .",
+    "test": "node tests/sim.js 6 70"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<!-- PAGE:START -->
+<title>Politopia+</title>
+<meta name="theme-color" content="#0b1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Jogo de estratégia por turnos inspirado em Polytopia, com ciência, diplomacia, recursos estratégicos, promoções e maravilhas.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Signika:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="map" aria-label="Mapa do jogo"></canvas>
+
+<!-- HUD da partida -->
+<div id="hud" hidden>
+  <header id="topbar">
+    <div id="tb-tribe" class="tribe-chip"></div>
+    <div class="res res-star" title="Estrelas: pagam unidades, melhorias e construções"><span class="res-ico">★</span><b id="tb-stars">0</b><small id="tb-stars-inc">+0</small></div>
+    <div class="res res-sci" title="Ciência: paga tecnologias"><span class="res-ico">⚗</span><b id="tb-sci">0</b><small id="tb-sci-inc">+0</small></div>
+    <div class="res res-turn"><span class="res-lbl">Turno</span><b id="tb-turn">1</b></div>
+    <button id="btn-menu" class="icon-btn" type="button" aria-label="Menu">☰</button>
+  </header>
+
+  <nav id="sidebar" aria-label="Painéis">
+    <button type="button" class="side-btn" id="btn-tech"><span>🔬</span><small>Tecnologia</small></button>
+    <button type="button" class="side-btn" id="btn-cities"><span>🏙️</span><small>Cidades</small></button>
+    <button type="button" class="side-btn" id="btn-diplo"><span>🤝</span><small>Diplomacia</small><i class="dot" id="diplo-dot" hidden></i></button>
+    <button type="button" class="side-btn" id="btn-stats"><span>📊</span><small>Placar</small></button>
+    <button type="button" class="side-btn" id="btn-log"><span>📜</span><small>Registro</small></button>
+  </nav>
+
+  <div id="ai-banner" hidden>
+    <span class="spinner"></span><span id="ai-banner-text">Vez da IA…</span>
+    <button type="button" id="btn-skip" class="chip-btn">Acelerar ⏩</button>
+  </div>
+
+  <div id="bottom">
+    <div id="bottom-row">
+      <button type="button" id="btn-next" class="btn ghost">Próxima unidade</button>
+      <button type="button" id="btn-end" class="btn primary">Fim do turno</button>
+    </div>
+    <section id="panel" hidden></section>
+  </div>
+</div>
+
+<!-- Menu principal -->
+<section id="menu" class="screen">
+  <div class="menu-card" id="menu-main">
+    <h1 class="logo">Politopia<span>+</span></h1>
+    <p class="tagline">Estratégia por turnos para celular: funde cidades, pesquise, negocie a paz e erga maravilhas.</p>
+    <div class="menu-actions">
+      <button type="button" id="m-continue" class="btn primary" hidden>Continuar partida</button>
+      <button type="button" id="m-new" class="btn primary">Novo jogo</button>
+      <button type="button" id="m-help" class="btn ghost">Como jogar</button>
+    </div>
+    <p class="menu-foot">Ao fundo: quatro tribos controladas pela IA disputando um continente.</p>
+  </div>
+  <form id="setup" class="setup-card" hidden></form>
+</section>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="modal-root"></div>
+
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/mapgen.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+<!-- PAGE:END -->
+</body>
+</html>
