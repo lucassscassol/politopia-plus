@@ -1,4 +1,4 @@
-/* Politopia+ — economia: renda das cidades, conexões com a capital, recursos (estratégicos e luxos),
+/* Chamas de Vardren — economia: renda das cidades, conexões com a capital, recursos (estratégicos e luxos),
    rotas comerciais, saque e reparo de infraestrutura, fortificações e logística (abastecimento).
    A renda e as conexões vieram do motor original e foram estendidas aqui. */
 (function (PP) {

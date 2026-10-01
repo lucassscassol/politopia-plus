@@ -1,4 +1,4 @@
-/* Politopia+ — interface: entrada, HUD, painéis, modais e fluxo de turnos */
+/* Chamas de Vardren — interface: entrada, HUD, painéis, modais e fluxo de turnos */
 (function (PP) {
   'use strict';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -6,13 +6,26 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const fmt = n => (Math.round(n * 10) / 10).toString().replace('.', ',');
-  const SAVE_KEY = 'politopia-plus:save';
-  const SET_KEY = 'politopia-plus:settings';
+  const SAVE_KEY = 'chamas-vardren:save';
+  const SET_KEY = 'chamas-vardren:settings';
   const SCI = '⚗︎';
   const ERA = ['', 'Era I · Tribal', 'Era II · Bronze', 'Era III · Reinos', 'Era IV · Pólvora'];
 
   function store(key, val) { try { if (val == null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } }
   function load(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+
+  // O jogo se chamava Politopia+: copia uma única vez a partida salva, as opções e as conquistas guardadas
+  // com o nome antigo para as chaves novas (as antigas ficam intactas, nada é apagado).
+  (function migrateLegacyStorage() {
+    try {
+      if (localStorage.getItem('chamas-vardren:migrated')) return;
+      for (const k of ['save', 'settings', 'achievements']) {
+        const old = localStorage.getItem('politopia-plus:' + k);
+        if (old && !localStorage.getItem('chamas-vardren:' + k)) localStorage.setItem('chamas-vardren:' + k, old);
+      }
+      localStorage.setItem('chamas-vardren:migrated', '1');
+    } catch (e) { /* armazenamento indisponível: segue sem migrar */ }
+  })();
 
   // ------------------------------------------------------------ Ícones e brasões (SVG inline)
   function ico(key, cls) {

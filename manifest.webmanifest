@@ -1,7 +1,7 @@
 {
-  "name": "Politopia+",
-  "short_name": "Politopia+",
-  "description": "Estratégia por turnos inspirada em Polytopia.",
+  "name": "Chamas de Vardren",
+  "short_name": "Vardren",
+  "description": "Estratégia por turnos num mundo coberto de cinzas.",
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "any",

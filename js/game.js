@@ -1,4 +1,4 @@
-/* Politopia+ — motor de regras. Não depende do DOM (pode rodar no Node para testes).
+/* Chamas de Vardren — motor de regras. Não depende do DOM (pode rodar no Node para testes).
    O núcleo cuida de mapa, unidades, cidades, turnos e salvamento. Os sistemas estendidos
    (diplomacia, economia, cidades, combate tático, naval, espionagem, eventos, vitórias...)
    ficam em módulos próprios que se registram com PP.registerSystem e se ligam por ganchos. */

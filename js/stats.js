@@ -1,4 +1,4 @@
-/* Politopia+ — estatísticas completas da partida (tela final, conquistas e replay). */
+/* Chamas de Vardren — estatísticas completas da partida (tela final, conquistas e replay). */
 (function (PP) {
   'use strict';
 

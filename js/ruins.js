@@ -1,4 +1,4 @@
-/* Politopia+ — ruínas com escolhas. Cada ruína tem um tipo (fortaleza, templo, biblioteca, acampamento,
+/* Chamas de Vardren — ruínas com escolhas. Cada ruína tem um tipo (fortaleza, templo, biblioteca, acampamento,
    túmulo) e oferece decisões: Explorar (a recompensa aleatória original), Saquear (estrelas na hora, mas as
    outras tribos não gostam), Restaurar (paga para transformar em algo útil) ou Honrar (túmulos).
    Ruínas antigas sem tipo (saves anteriores) continuam dando a recompensa original. */

@@ -1,4 +1,4 @@
-/* Politopia+ — replay simplificado: um quadro por rodada (dono de cada casa, cidades e unidades) e uma
+/* Chamas de Vardren — replay simplificado: um quadro por rodada (dono de cada casa, cidades e unidades) e uma
    linha do tempo com os grandes acontecimentos. Os quadros são compactados em texto para caber no save. */
 (function (PP) {
   'use strict';

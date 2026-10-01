@@ -1,6 +1,5 @@
-/* Politopia+ — combate tático: flanqueamento, ataque pelas costas, formação, terreno elevado,
-   emboscada, linha de visão, ataques de oportunidade, fortificações, abastecimento e habilidades ativas.
-   A fórmula de dano original (estilo Polytopia) continua a mesma; aqui só entram multiplicadores. */
+/* Chamas de Vardren — combate tático: flanqueamento, ataque pelas costas, formação, terreno elevado,
+   emboscada, linha de visão, ataques de oportunidade, fortificações, abastecimento e habilidades ativas. */
 (function (PP) {
   'use strict';
   const UN = PP.UNITS;

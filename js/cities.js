@@ -1,4 +1,4 @@
-/* Politopia+ — cidades: especialização, marcos de progressão, crescimento agrícola,
+/* Chamas de Vardren — cidades: especialização, marcos de progressão, crescimento agrícola,
    ocupação, lealdade e revolta. */
 (function (PP) {
   'use strict';

@@ -1,4 +1,4 @@
-/* Politopia+ — espionagem e contraespionagem. O Espião é furtivo (só é visto por quem está colado nele,
+/* Chamas de Vardren — espionagem e contraespionagem. O Espião é furtivo (só é visto por quem está colado nele,
    por torres de vigia, fortalezas, cidades com Guarda ou outros espiões por perto) e realiza missões perto
    de cidades de outras tribos. Cada missão tem um risco de captura que depende das defesas do alvo. */
 (function (PP) {

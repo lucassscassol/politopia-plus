@@ -1,4 +1,4 @@
-/* Politopia+ — utilidades: RNG com semente, ruído, helpers */
+/* Chamas de Vardren — utilidades: RNG com semente, ruído, helpers */
 (function (PP) {
   'use strict';
 

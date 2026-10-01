@@ -1,8 +1,8 @@
 {
-  "name": "politopia-plus",
+  "name": "chamas-de-vardren",
   "version": "2.0.0",
   "private": true,
-  "description": "Jogo de estratégia por turnos inspirado em Polytopia, em HTML/JS puro.",
+  "description": "Chamas de Vardren: jogo de estratégia por turnos em HTML/JS puro.",
   "scripts": {
     "start": "npx --yes http-server -p 8080 -c-1 .",
     "test": "node tests/systems.js && node tests/sim.js 8 70",

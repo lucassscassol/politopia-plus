@@ -1,4 +1,4 @@
-/* Politopia+ — inteligência artificial das tribos rivais */
+/* Chamas de Vardren — inteligência artificial das tribos rivais */
 (function (PP) {
   'use strict';
   const UN = PP.UNITS;

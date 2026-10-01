@@ -1,4 +1,4 @@
-/* Politopia+ — geração procedural de mapas.
+/* Chamas de Vardren — geração procedural de mapas.
    Ordem de geração (cada etapa nunca sobrescreve o que as anteriores garantiram):
      0. mundo (elevação, terra, biomas e terrenos)
      1. capitais            2. área inicial          3. recursos essenciais

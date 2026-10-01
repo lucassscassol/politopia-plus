@@ -1,4 +1,4 @@
-/* Politopia+ — renderizador isométrico em Canvas 2D
+/* Chamas de Vardren — renderizador isométrico em Canvas 2D
    Direção visual: fantasia medieval sombria. Paleta terrosa e acinzentada, texturas procedurais,
    luz vinda da esquerda, heráldica nas unidades e cidades, névoa de fumaça e cinzas no ar. */
 (function (PP) {

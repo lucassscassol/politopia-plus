@@ -1,4 +1,4 @@
-/* Politopia+ — diplomacia: estados de relação, tratados, alianças, comércio, tributo,
+/* Chamas de Vardren — diplomacia: estados de relação, tratados, alianças, comércio, tributo,
    guerra conjunta e memória diplomática. Estende as funções de paz/guerra do jogo original. */
 (function (PP) {
   'use strict';

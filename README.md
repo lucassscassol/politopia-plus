@@ -1,6 +1,6 @@
-# Politopia+
+# Chamas de Vardren
 
-Jogo de estratégia por turnos para navegador e celular, inspirado em **The Battle of Polytopia**, com mais camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, cidades especializadas, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo.
+Jogo de estratégia por turnos para navegador e celular, com várias camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, cidades especializadas, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo.
 
 Roda direto no navegador, sem build e sem dependências: HTML, CSS e JavaScript puro, com o mapa desenhado em Canvas isométrico.
 
@@ -15,9 +15,9 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `O` objetivos, `Esc` fecha janelas.
 
-A partida é salva automaticamente no aparelho a cada turno. Saves da versão anterior continuam abrindo (são convertidos na hora e mantêm as regras de vitória com que foram criados).
+A partida é salva automaticamente no aparelho a cada turno. Saves, opções e conquistas gravados com o nome antigo do jogo (Politopia+) são copiados para o nome novo na primeira abertura. Saves da versão anterior continuam abrindo (são convertidos na hora e mantêm as regras de vitória com que foram criados).
 
-## O que tem de "mais" em relação ao Polytopia
+## Sistemas principais
 
 | Sistema | Como funciona aqui |
 | --- | --- |
@@ -73,7 +73,7 @@ A partida é salva automaticamente no aparelho a cada turno. Saves da versão an
 
 ### Combate
 
-Mesma base do Polytopia:
+Fórmula base:
 
 ```
 força de ataque = ataque × vida/vida máxima

@@ -1,4 +1,4 @@
-/* Politopia+ — cenários. Cada cenário ajusta as opções antes de gerar o mapa (configure) e as condições
+/* Chamas de Vardren — cenários. Cada cenário ajusta as opções antes de gerar o mapa (configure) e as condições
    iniciais depois de criar as tribos (init). A "Partida normal" não muda nada. */
 (function (PP) {
   'use strict';

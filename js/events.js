@@ -1,4 +1,4 @@
-/* Politopia+ — eventos mundiais. São anunciados dois turnos antes, têm duração conhecida e efeitos
+/* Chamas de Vardren — eventos mundiais. São anunciados dois turnos antes, têm duração conhecida e efeitos
    claros, para que os jogadores possam se preparar. A escolha usa o RNG da partida (determinístico). */
 (function (PP) {
   'use strict';

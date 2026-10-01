@@ -1,4 +1,4 @@
-/* Politopia+ — conquistas. Cada conquista mede o progresso de um jogador humano; as desbloqueadas ficam
+/* Chamas de Vardren — conquistas. Cada conquista mede o progresso de um jogador humano; as desbloqueadas ficam
    gravadas na partida (g.achievements) e a interface também guarda um histórico no aparelho. */
 (function (PP) {
   'use strict';

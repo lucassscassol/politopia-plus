@@ -1,4 +1,4 @@
-/* Politopia+ — naval: portos das cidades, navios de verdade (Escuna, Transporte, Fragata, Couraçado),
+/* Chamas de Vardren — naval: portos das cidades, navios de verdade (Escuna, Transporte, Fragata, Couraçado),
    embarque em transportes e desembarque anfíbio. O embarque antigo (tropas viram barcos ao entrar
    na água pelo porto) continua funcionando como antes. */
 (function (PP) {

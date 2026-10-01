@@ -1,4 +1,4 @@
-/* Politopia+ — condições de vitória. Dominação (e Pontos) continuam no motor; aqui entram Científica,
+/* Chamas de Vardren — condições de vitória. Dominação (e Pontos) continuam no motor; aqui entram Científica,
    Econômica, Maravilhas, Territorial, Diplomática e Sobrevivência. Todas coexistem: a partida acaba na
    primeira que for cumprida. Partidas antigas (sem opts.victories) seguem só com as regras originais. */
 (function (PP) {

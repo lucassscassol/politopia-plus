@@ -1,4 +1,4 @@
-/* Politopia+ — névoa de guerra com estados: não explorado, explorado, visível e inteligência recente.
+/* Chamas de Vardren — névoa de guerra com estados: não explorado, explorado, visível e inteligência recente.
    Cada jogador guarda quando viu cada casa pela última vez e onde viu tropas inimigas; essas
    "aparições" continuam no mapa (como fantasmas) por alguns turnos depois de sumirem da vista. */
 (function (PP) {

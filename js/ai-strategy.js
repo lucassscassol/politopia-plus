@@ -1,4 +1,4 @@
-/* Politopia+ — estratégia da IA: análise da situação, objetivos de longo prazo mantidos por vários turnos
+/* Chamas de Vardren — estratégia da IA: análise da situação, objetivos de longo prazo mantidos por vários turnos
    (Dominação, Ciência, Economia, Diplomacia, Territorial e Defesa de emergência), campanhas contra cidades
    importantes, avaliação de propostas diplomáticas e iniciativas diplomáticas. Usado por ai.js. */
 (function (PP) {

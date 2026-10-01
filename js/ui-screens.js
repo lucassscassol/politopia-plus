@@ -1,4 +1,4 @@
-/* Politopia+ — telas e seções da interface para os sistemas estendidos: objetivos e vitórias, eventos,
+/* Chamas de Vardren — telas e seções da interface para os sistemas estendidos: objetivos e vitórias, eventos,
    especialização, lealdade e rotas das cidades, propostas diplomáticas, comércio, tributo, guerra conjunta,
    espionagem, ruínas, conquistas, replay e estatísticas finais. Estende PP.UI (ui.js). */
 (function (PP) {
@@ -7,7 +7,7 @@
   const { esc, SCI, tribeIcon, crest, ico, store, load } = H;
   const UN = PP.UNITS;
   const $ = (s, r) => (r || document).querySelector(s);
-  const ACH_KEY = 'politopia-plus:achievements';
+  const ACH_KEY = 'chamas-vardren:achievements';
 
   const bar = (pct, cls) => `<span class="bar ${cls || ''}"><i style="width:${Math.round(Math.max(0, Math.min(1, pct)) * 100)}%"></i></span>`;
 

@@ -1,4 +1,4 @@
-/* Politopia+ — definições de regras: terrenos, recursos, tecnologias, unidades, construções, tribos */
+/* Chamas de Vardren — definições de regras: terrenos, recursos, tecnologias, unidades, construções, tribos */
 (function (PP) {
   'use strict';
 

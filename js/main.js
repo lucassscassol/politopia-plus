@@ -1,4 +1,4 @@
-/* Politopia+ — inicialização */
+/* Chamas de Vardren — inicialização */
 (function (PP) {
   'use strict';
   function start(data) {
