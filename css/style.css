@@ -485,3 +485,41 @@ select {
 .replay-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.86rem; color: var(--muted); margin-bottom: 8px; }
 .card.ach .ci { color: var(--gold-hi); }
 .card.ach.locked .ci { color: var(--faint); }
+
+/* ------------------------------------------------------------------ HUD do celular
+   Barra de abas fixa no rodapé; logo acima dela, a fileira Próxima unidade / Fim do turno, que nunca muda
+   de lugar; o painel da seleção abre acima dessa fileira. Assim nada pula de posição quando um painel abre. */
+.res-event b { font-weight: 700; color: var(--gold-hi); }
+@media (max-width: 819px) {
+  :root { --dock-h: 58px; }
+  #sidebar {
+    left: 0; right: 0; top: auto; bottom: 0; z-index: 11;
+    flex-direction: row; justify-content: space-around; align-items: stretch; gap: 2px;
+    height: calc(var(--dock-h) + var(--safe-b));
+    padding: 5px 6px calc(var(--safe-b) + 5px);
+    background: var(--grain), linear-gradient(rgba(26, 22, 18, 0.97), rgba(12, 10, 8, 0.98));
+    border-top: 1px solid var(--line-2);
+    box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.45);
+  }
+  .side-btn {
+    flex: 1 1 0; width: auto; min-width: 0; max-width: 76px;
+    justify-content: center; padding: 4px 0 2px;
+    background: none; border-color: transparent; box-shadow: none;
+  }
+  .side-btn:active { background: rgba(201, 164, 92, 0.12); border-color: var(--line); }
+  .side-btn small { font-size: 0.5rem; }
+  .side-btn .dot { top: 3px; right: calc(50% - 16px); }
+  #bottom { bottom: calc(var(--dock-h) + var(--safe-b)); padding: 0 10px 8px; gap: 6px; }
+  #panel { order: 1; max-height: 40vh; }
+  #bottom-row { order: 2; align-items: center; }
+  #toasts .toast:not(:nth-last-child(-n+2)) { display: none; }
+}
+@media (max-width: 420px) {
+  .res-event { padding: 5px 7px; gap: 3px; }
+  .res-event .ev-name { display: none; }
+  #toasts { top: calc(var(--safe-t) + 104px); }
+  .toast { font-size: 0.86rem; padding: 6px 12px; }
+}
+@media (max-width: 380px) {
+  .side-btn small { font-size: 0.44rem; letter-spacing: 0; }
+}

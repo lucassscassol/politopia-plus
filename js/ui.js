@@ -122,6 +122,7 @@
         pts.delete(e.pointerId);
         if (pts.size < 2) pinch = null;
         if (had && pts.size === 0 && !panning && e.type === 'pointerup') {
+          this.lastMapTap = performance.now();
           const p = local(e);
           const hit = this.game && this.r.unitAtScreen(p.x, p.y);
           const t = hit ? this.game.tileAt(hit) : this.r.screenToTile(p.x, p.y);
@@ -130,6 +131,14 @@
       };
       c.addEventListener('pointerup', up);
       c.addEventListener('pointercancel', up);
+      // No celular, depois de um toque o navegador ainda dispara um "click" no ponto tocado. Se o toque abriu
+      // um painel, esse clique cairia num botão que acabou de aparecer ali (ex.: Fim do turno). Cancelar o
+      // touchend do mapa impede esse clique; o filtro abaixo cobre navegadores que o disparam mesmo assim.
+      c.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+      window.addEventListener('click', e => {
+        if (e.target === c || !this.lastMapTap || performance.now() - this.lastMapTap > 450) return;
+        if (e.target.closest && e.target.closest('#hud, #modal-root')) { e.stopPropagation(); e.preventDefault(); }
+      }, true);
       c.addEventListener('pointerleave', () => { if (this.r.hl.hover) { this.r.hl.hover = null; this.r.dirty = true; } });
       c.addEventListener('wheel', e => {
         e.preventDefault();

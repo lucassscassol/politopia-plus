@@ -36,12 +36,12 @@
         const def = PP.EVENTS[a.id];
         const left = a.end - g.turn + 1;
         chip.className = 'res res-event';
-        chip.innerHTML = `${ico(def.icon)}<span>${def.name} · ${left}t</span>`;
+        chip.innerHTML = `${ico(def.icon)}<span class="ev-name">${def.name}</span><b>${left}t</b>`;
         chip.title = def.desc;
       } else {
         const def = PP.EVENTS[ev.upcoming.id];
         chip.className = 'res res-event soon';
-        chip.innerHTML = `${ico(def.icon)}<span>${def.name} em ${Math.max(0, ev.upcoming.start - g.turn)}t</span>`;
+        chip.innerHTML = `${ico(def.icon)}<span class="ev-name">${def.name} em</span><b>${Math.max(0, ev.upcoming.start - g.turn)}t</b>`;
         chip.title = 'Previsão: ' + def.desc;
       }
       chip.hidden = false;
