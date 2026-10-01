@@ -41,6 +41,7 @@ function unit(g, type, owner, x, y) {
   const u = g.createUnit(type, owner, x, y, null, true);
   return u;
 }
+function place(g, u, x, y) { g.uGrid[u.y * g.W + u.x] = null; u.x = x; u.y = y; g.uGrid[y * g.W + x] = u; g.realmReset && g.realmReset(); }
 function meetAll(g) { for (const a of g.players) for (const b of g.players) if (a !== b) { a.met[b.id] = true; } }
 function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p)); }
 
@@ -539,6 +540,216 @@ function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p));
       ok(caps.length === np, mt + ' ' + size + ': todas as capitais');
     }
     ok(bad <= Math.ceil(total * 0.05), `mapas aprovados na validação (${total - bad}/${total})`);
+  });
+
+  // ---------------------------------------------------------------- Organização do reino, Era V e personagens
+  await test('reino: capacidade administrativa e desordem', () => {
+    const g = blank({ size: 20, players: 2 });
+    const p = g.players[0];
+    p.techs = {};
+    ok(g.realmOn(), 'partidas novas têm a organização do reino');
+    city(g, 0, 2, 2, true);
+    for (let i = 1; i < 8; i++) city(g, 0, 2 + (i % 4) * 3, 2 + Math.floor(i / 4) * 3);
+    city(g, 1, 17, 17, true);
+    g.realmReset();
+    let cap = g.adminCapacity(p);
+    ok(cap.total === PP.REALM.base && cap.cities === 8 && cap.excess === 4, `capacidade base ${cap.total}, 8 cidades, excesso ${cap.excess}`);
+    ok(Math.abs(cap.rate - 0.2) < 1e-9, 'desordem de 5% por cidade excedente');
+    let inc = g.income(p);
+    const line = inc.lines.find(l => l.label === PP.t('Desordem administrativa'));
+    ok(line && line.stars < 0, 'linha de desordem na renda');
+    const before = inc.stars;
+    p.techs.organizacao = true; p.techs.escrita = true; p.techs.codigo_leis = true;
+    g.build(p, g.citiesOf(0)[1], 'tribunal');
+    cap = g.adminCapacity(p);
+    ok(cap.total === PP.REALM.base + 3 + 1 && cap.excess === 0, 'tecnologias e Tribunal aumentam a capacidade (' + cap.total + ')');
+    inc = g.income(p);
+    ok(!inc.lines.some(l => l.label === PP.t('Desordem administrativa')) && inc.stars > before, 'sem desordem a renda volta');
+    for (let i = 0; i < 6; i++) city(g, 0, 2 + i * 3, 14);
+    g.realmReset();
+    ok(g.adminCapacity(p).rate === PP.REALM.disorderMax, 'desordem limitada a 25%');
+    g.opts.realm = false; g.realmReset();
+    ok(g.adminCapacity(p).rate === 0, 'sem a opção, não há desordem');
+  });
+
+  await test('reino: alcance da corte, Paço Regional, Governador e Tribunal', () => {
+    const g = blank({ size: 26, players: 2 });
+    const p = g.players[0];
+    p.stars = 500;
+    const cap = city(g, 0, 2, 2, true);
+    const far = city(g, 0, 12, 12);
+    const mid = city(g, 0, 9, 9);
+    city(g, 1, 24, 24, true);
+    g.realmReset();
+    ok(!g.adminInfo(cap).remote && g.adminInfo(cap).center === 'capital', 'a capital é o centro do reino');
+    ok(g.adminInfo(far).remote, 'cidade a 10 casas está longe da corte');
+    ok(g.remoteCut(far) === PP.REALM.remoteCut, 'longe da corte rende 20% menos');
+    const ci = g.cityIncome(far);
+    ok(ci.notes.some(n => n.indexOf(PP.t('Longe da corte −{n}%', { n: 20 })) >= 0), 'nota de distância na renda da cidade');
+    ok(g.loyaltyFactors(far).some(f => f[0] === PP.t('Longe da corte') && f[1] < 0), 'distância pesa na lealdade');
+    ok(!g.adminInfo(mid).remote, 'cidade a 7 casas está ao alcance');
+    far.connected = true; g.realmReset();
+    ok(g.adminInfo(far).remote, 'estrada encurta 2 casas (10 → 8, ainda fora)');
+    far.connected = false;
+    p.techs.codigo_leis = true;
+    g.build(p, far, 'tribunal');
+    ok(Math.abs(g.remoteCut(far) - PP.REALM.remoteCut / 2) < 1e-9, 'Tribunal corta a penalidade pela metade');
+    p.techs.burocracia = true;
+    ok(g.buildingCheck(p, mid, 'chancery').reason === PP.t('Só na capital'), 'Chancelaria só na capital');
+    ok(g.buildingCheck(p, cap, 'regional_seat').reason === PP.t('A capital já é o centro do reino'), 'Paço Regional fora da capital');
+    mid.level = 3;
+    ok(g.buildingCheck(p, mid, 'regional_seat').ok, 'Paço Regional numa cidade de nível 3 longe da capital');
+    const costBefore = g.buildingCost(p, 'regional_seat', mid);
+    g.build(p, mid, 'regional_seat');
+    ok(!g.adminInfo(far).remote && g.adminInfo(far).province === mid, 'o Paço Regional cobre a cidade distante');
+    ok(g.loyaltyFactors(far).some(f => f[0] === PP.BUILDINGS.regional_seat.name), 'província dá lealdade');
+    ok(g.buildingCost(p, 'regional_seat', far) === costBefore + PP.REALM.seatExtraCost, 'cada paço encarece o próximo');
+    ok(g.buildingCheck(p, far, 'regional_seat').reason === PP.t('Muito perto de outro centro administrativo') || far.level < 3, 'paços não podem ficar colados');
+    g.build(p, cap, 'chancery');
+    ok(g.adminCenters(0).find(o => o.kind === 'capital').radius === PP.REALM.capitalRadius + PP.REALM.chanceryRadius, 'Chancelaria amplia o alcance da capital');
+    // Governador: torna a cidade em que está um centro administrativo
+    const far2 = city(g, 0, 22, 4);
+    g.realmReset();
+    ok(g.adminInfo(far2).remote, 'outra cidade longe da corte');
+    const u = g.unitAt(far2.x, far2.y); if (u) g.disband(u);
+    const gov = g.train(p, far2, 'governor');
+    ok(gov && gov.home === null && gov.name, 'Governador nomeado, sem ocupar vaga da cidade');
+    ok(g.governedCity(0) === far2 && g.adminInfo(far2).center === 'governor', 'a cidade do Governador vira centro');
+    ok(g.cityIncome(far2).notes.some(n => n.indexOf(PP.UNITS.governor.name) >= 0), 'Governador rende estrelas na cidade');
+    ok(g.adminCapacity(p).parts.some(x => x[0] === PP.UNITS.governor.name), 'Governador soma capacidade');
+    place(g, gov, far2.x - 1, far2.y);
+    ok(g.governedCity(0) === far2, 'ao lado da cidade continua governando');
+    place(g, gov, far2.x - 3, far2.y);
+    ok(g.governedCity(0) === null && g.adminInfo(far2).remote, 'longe da cidade deixa de governar');
+  });
+
+  await test('reino: personagens únicos, com nome, fora da capacidade e não convertíveis', () => {
+    const g = blank({ players: 2 });
+    const p = g.players[0];
+    p.stars = 200;
+    const c = city(g, 0, 3, 3, true);
+    city(g, 1, 11, 11, true);
+    p.techs.arte_guerra = true; p.techs.diplomacia_real = true;
+    ok(g.trainCheck(p, c, 'general').reason === PP.t('Requer {x}', { x: PP.BUILDINGS.war_academy.name }), 'General exige a Academia Militar');
+    g.build(p, c, 'war_academy');
+    const cap = g.capacity(c);
+    const gen = g.train(p, c, 'general');
+    ok(gen && gen.name && gen.name.length >= 3, 'General recebe nome próprio (' + (gen && gen.name) + ')');
+    ok(g.cityUnits(c).length === 0 && g.capacity(c) === cap, 'personagem não ocupa vaga');
+    place(g, gen, 4, 3);
+    ok(g.trainCheck(p, c, 'general').reason === PP.t('Seu reino já tem um {u}', { u: PP.UNITS.general.name }), 'um General por reino');
+    const env = g.train(p, c, 'envoy');
+    ok(env && env.name && env.name !== gen.name, 'Embaixador com outro nome');
+    ok(g.logs.some(l => l.text === PP.t('{p} nomeou {u}.', { p: p.name, u: g.characterTitle(gen) })), 'crônica registra a nomeação');
+    const m = unit(g, 'missionary', 1, 5, 3);
+    g.players[1].techs.filosofia = true;
+    ok(!g.convertTargets(m).some(d => d === gen), 'personagens não podem ser convertidos');
+    g.killUnit(gen, null);
+    ok(g.logs.some(l => l.text === PP.t('{u} de {p} caiu.', { u: g.characterTitle(gen), p: p.name })), 'morte do personagem na crônica');
+    ok(!g.characterOf(0, 'general') && g.trainCheck(p, c, 'general').reason !== PP.t('Seu reino já tem um {u}', { u: PP.UNITS.general.name }), 'pode nomear outro depois');
+  });
+
+  await test('reino: comando do General', () => {
+    const g = blank({ players: 2 });
+    city(g, 0, 1, 1, true); city(g, 1, 12, 12, true);
+    const a = unit(g, 'warrior', 0, 5, 5), d = unit(g, 'warrior', 1, 6, 5);
+    const base = g.previewAttack(a, d);
+    const gen = unit(g, 'general', 0, 4, 5);
+    g.realmReset();
+    const boosted = g.previewAttack(a, d);
+    ok(boosted.dmg > base.dmg, `ataque com o General ao lado (${base.dmg} → ${boosted.dmg})`);
+    ok((boosted.notes || []).some(n => n.indexOf(PP.t('Comando do General')) >= 0), 'nota do comando no ataque');
+    const back = g.previewAttack(d, a);
+    g.killUnit(gen, null);
+    const back2 = g.previewAttack(d, a);
+    ok(back.dmg < back2.dmg, `defesa com o General ao lado (${back2.dmg} → ${back.dmg})`);
+  });
+
+  await test('reino: Embaixada e Embaixador melhoram a opinião', () => {
+    const g = blank({ players: 3 });
+    const p = g.players[0];
+    p.stars = 100;
+    const c = city(g, 0, 2, 2, true); city(g, 1, 11, 2, true); city(g, 2, 6, 11, true);
+    meetAll(g);
+    g.makePeace(0, 1);
+    p.techs.diplomacia_real = true;
+    g.build(p, c, 'embassy');
+    ok(g.buildingCheck(p, c, 'embassy').done, 'Embaixada construída');
+    const c2 = city(g, 0, 4, 5);
+    ok(g.buildingCheck(p, c2, 'embassy').locked, 'uma Embaixada por reino');
+    const op0 = g.opinion(1, 0);
+    g.hook('beforeTurn', p);
+    ok(g.memorySummary(1, 0).some(m => m.kind === 'embassy'), 'tribo em paz lembra da Embaixada');
+    ok(!g.memorySummary(2, 0).some(m => m.kind === 'embassy'), 'tribo em guerra não');
+    const env = unit(g, 'envoy', 0, 10, 3);
+    g.tile(10, 3).owner = 1;
+    g.hook('beforeTurn', p);
+    ok(g.envoyHost(env) === g.players[1], 'Embaixador em missão no território da tribo');
+    ok(g.memorySummary(1, 0).some(m => m.kind === 'envoy'), 'missão do Embaixador lembrada');
+    ok(g.opinion(1, 0) > op0, 'opinião sobe');
+    ok(p.intel && p.intel[1] && p.intel[1].turn === g.turn, 'relatório da tribo visitada');
+    g.declareWar(0, 1);
+    ok(!g.envoyHost(env), 'em guerra a missão acaba');
+  });
+
+  await test('reino: Era V, novas unidades e construções', () => {
+    const g = blank({ players: 2 });
+    const p = g.players[0];
+    p.stars = 300;
+    const c = city(g, 0, 3, 3, true); city(g, 1, 11, 11, true);
+    const era5 = PP.TECHS.filter(t => t.tier === 5);
+    ok(era5.length === 5 && era5.every(t => t.req.every(r => PP.TECH[r] && PP.TECH[r].tier >= 3)), 'Era V com 5 tecnologias e pré-requisitos válidos');
+    ok(g.techCost(p, 'burocracia') > g.techCost(p, 'economia'), 'Era V custa mais que a Era IV');
+    p.techs.arte_guerra = true; p.techs.siderurgia = true; p.techs.imprensa = true; p.techs.escrita = true;
+    ok(g.trainCheck(p, c, 'dragoon').reason === PP.t('Requer {x}', { x: PP.STRATEGIC.horses.name }), 'Dragão exige Cavalos');
+    ok(g.trainCheck(p, c, 'mortar').reason === PP.t('Requer {x}', { x: PP.STRATEGIC.iron.name }), 'Morteiro exige Ferro');
+    ok(PP.ABILITIES.bombard.units.indexOf('mortar') >= 0 && PP.ABILITIES.aim.units.indexOf('dragoon') >= 0, 'habilidades das unidades novas');
+    const musk = g.unitCostFor(p, c, 'musketeer');
+    g.build(p, c, 'foundry');
+    ok(g.unitCostFor(p, c, 'musketeer') === musk - 1, 'Fundição barateia unidades de ferro');
+    const cap = g.capacity(c);
+    g.build(p, c, 'war_academy');
+    ok(g.capacity(c) === cap + 1 && g.recruitXp(c, 'warrior') >= 1, 'Academia Militar: capacidade e XP');
+    const sci = g.cityIncome(c).sci;
+    g.build(p, c, 'library'); p.techs.escrita = true;
+    const sci2 = g.cityIncome(c).sci;
+    g.build(p, c, 'press');
+    const sci3 = g.cityIncome(c).sci;
+    ok(sci2 >= sci + 3 && sci3 === sci2 + PP.REALM.pressSci, `Imprensa: biblioteca +1 e Casa da Imprensa +2 (${sci} → ${sci2} → ${sci3})`);
+    ok(g.loyaltyFactors(c).some(f => f[0] === PP.BUILDINGS.press.name), 'Casa da Imprensa dá lealdade');
+    const sc = g.score(p);
+    ok(sc > 0 && PP.ACHIEVEMENT.corte && PP.ACHIEVEMENT.organizado, 'conquistas novas registradas');
+  });
+
+  await test('reino: partidas antigas e salvar/carregar', async () => {
+    const g = new PP.Game().setup({ seed: 77, size: 18, players: PP.TRIBE_IDS.slice(0, 3).map(t => ({ tribe: t })) });
+    for (let i = 0; i < 9; i++) { await PP.AI.takeTurn(g); g.endTurn(); }
+    const p = g.players[0];
+    p.techs.burocracia = true;
+    const c = g.citiesOf(0)[0];
+    const u = g.unitAt(c.x, c.y); if (u) g.disband(u);
+    g.current = 0; p.stars += 50;
+    const gov = g.train(p, c, 'governor');
+    const json = JSON.parse(JSON.stringify(g.toJSON()));
+    const g2 = PP.Game.fromJSON(json);
+    ok(g2.realmOn(), 'opção do reino salva');
+    const gov2 = g2.units.find(x => x.id === gov.id);
+    ok(gov2 && gov2.name === gov.name && gov2.home === null, 'personagem e nome salvos');
+    ok(JSON.stringify(g2.toJSON()) === JSON.stringify(json), 'ida e volta idêntica');
+    delete json.opts.realm;
+    const old = PP.Game.fromJSON(json);
+    ok(!old.realmOn() && old.adminCapacity(old.players[0]).rate === 0, 'partida antiga: sem desordem');
+    ok(old.citiesOf(0).every(c2 => !old.adminInfo(c2).remote), 'partida antiga: sem distância da corte');
+  });
+
+  await test('mapas: tamanhos Colossal e Titânico', async () => {
+    for (const size of [32, 40]) {
+      const g = new PP.Game().setup({ seed: 900 + size, size, mapType: 'continentes', players: PP.TRIBE_IDS.map(t => ({ tribe: t })) });
+      ok(g.W === size && g.cities.filter(c => c.capital).length === 6, size + ': seis capitais');
+      ok(g.tiles.filter(t => t.village).length >= size, size + ': aldeias suficientes (' + g.tiles.filter(t => t.village).length + ')');
+      for (let i = 0; i < 12; i++) { await PP.AI.takeTurn(g); g.endTurn(); }
+      ok(!g.over && g.turn >= 3, size + ': a IA joga');
+    }
   });
 
   console.log(`\n${passed} verificações ok, ${failed} falhas`);

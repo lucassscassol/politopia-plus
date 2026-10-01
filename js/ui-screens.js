@@ -22,6 +22,7 @@
         <div class="row2">
           <div class="field"><span class="lbl">${PP.t('Outras vitórias')}${forced ? ' · ' + PP.t('o cenário define as vitórias') : ''}</span><div class="seg">${vic}</div></div>
           <div class="field"><span class="lbl">${PP.t('Eventos mundiais')}</span><div class="seg"><button type="button" class="${s.events ? 'on' : ''}" data-s="events">${s.events ? PP.t('Ativados') : PP.t('Desativados')}</button></div></div>
+          <div class="field"><span class="lbl">${PP.t('Organização do reino')}</span><div class="seg"><button type="button" class="${s.realm ? 'on' : ''}" data-s="realm" title="${esc(PP.t('Desordem administrativa e alcance da corte'))}">${s.realm ? PP.t('Ativada') : PP.t('Desativada')}</button></div></div>
         </div>`;
     },
 

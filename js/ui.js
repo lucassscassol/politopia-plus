@@ -9,7 +9,7 @@
   const SAVE_KEY = 'chamas-vardren:save';
   const SET_KEY = 'chamas-vardren:settings';
   const SCI = '⚗︎';
-  const ERA = () => ['', PP.t('Era I · Tribal'), PP.t('Era II · Bronze'), PP.t('Era III · Reinos'), PP.t('Era IV · Pólvora')];
+  const ERA = () => ['', PP.t('Era I · Tribal'), PP.t('Era II · Bronze'), PP.t('Era III · Reinos'), PP.t('Era IV · Pólvora'), PP.t('Era V · Impérios')];
 
   // Redesenhar com innerHTML recria as áreas roláveis e a rolagem voltaria ao início. keepScroll guarda a rolagem
   // de root e das áreas roláveis dentro dele, roda o redesenho e devolve cada uma à posição anterior.
@@ -327,6 +327,7 @@
         scenario: saved.lastScenario && PP.SCENARIOS[saved.lastScenario] ? saved.lastScenario : 'normal',
         victories: Object.assign({ ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true }, saved.lastVictories || {}),
         events: saved.lastEvents !== false,
+        realm: saved.lastRealm !== false,
       };
       this.renderSetup(false);
     }
@@ -378,6 +379,7 @@
         else if (a === 'set') s[b.dataset.k] = b.dataset.k === 'size' ? +b.dataset.v : b.dataset.v;
         else if (a === 'vic') s.victories[b.dataset.k] = !s.victories[b.dataset.k];
         else if (a === 'events') s.events = !s.events;
+        else if (a === 'realm') s.realm = !s.realm;
         else if (a === 'scenario') s.scenario = b.dataset.v;
         else if (a === 'back') { f.hidden = true; $('#menu-main').hidden = false; return; }
         if (s.slots.length < 2) s.slots.push({ tribe: PP.TRIBE_IDS.find(t => !s.slots.some(x => x.tribe === t)), human: false });
@@ -402,10 +404,10 @@
       const chk = PP.scenarioCheck(s.scenario, players);
       if (!chk.ok) { this.toast(`${PP.SCENARIOS[s.scenario].name}: ${chk.reason}.`, 'bad'); return; }
       Object.assign(this.settings, { lastTribe: s.slots[0].tribe, lastSize: s.size, lastMap: s.mapType, lastDiff: s.difficulty, lastVictory: s.victory,
-        lastScenario: s.scenario, lastVictories: s.victories, lastEvents: s.events });
+        lastScenario: s.scenario, lastVictories: s.victories, lastEvents: s.events, lastRealm: s.realm });
       this.applySettings();
       const victories = Object.assign({ dominacao: true, pontos: victory === 'pontos' }, s.victories);
-      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit, victories, events: s.events, scenario: s.scenario, players });
+      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit, victories, events: s.events, realm: s.realm, scenario: s.scenario, players });
       this.attach(g, true);
     }
 
@@ -872,7 +874,7 @@
       const owner = g.players[u.owner];
       const rank = g.rank(u);
       const rankTag = rank === 2 ? `<span class="tag gold">${PP.t('Elite')}</span>` : rank === 1 ? `<span class="tag gold">${PP.t('Veterano')}</span>` : '';
-      const title = `${st.name} ${rankTag}`;
+      const title = `${st.name}${u.name ? ' ' + esc(u.name) : ''} ${rankTag}`;
       const sub = `${esc(owner.name)}${st.naval && !UN[u.type].naval ? ' · ' + PP.t('{u} embarcado', { u: UN[u.type].name }) : ''}${u.cargo ? ' · ' + PP.t('{n}/{m} a bordo', { n: u.cargo.length, m: UN[u.type].cargo }) : ''} · ${TER[g.tileAt(u).terrain].name}`;
       const bonus = g.defenseBonus(u);
       let html = this.head(crest(owner.color, unitIcon(g, u), 'crest-l'), title, sub, owner.color);
@@ -944,6 +946,7 @@
         html += this.head(crest(co.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l'), `${esc(c.name)} <span class="tag">${PP.t('Nível {n}', { n: PP.roman(c.level) })}</span>${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${c.metropolis ? ` <span class="tag gold">${PP.t('Metrópole')}</span>` : ''}`, `${esc(co.name)}${c.capital ? ' · ' + PP.t('Capital') : ''} · ${ter.name}`, co.color);
         const status = g.cityStatus(c);
         if (status) html += `<p class="note"><span class="tag ${status.tag}">${status.name}</span>${mine ? ' ' + PP.t('Lealdade {n}/100.', { n: c.loyalty }) : ''}</p>`;
+        if (mine && this.realmCityNote) html += this.realmCityNote(c);
         const need = c.level + 1;
         html += `<div class="popbar" aria-label="${PP.t('População')}">${Array.from({ length: need }, (_, k) => `<i class="${k < c.pop ? 'on' : ''}"></i>`).join('')}</div>`;
         if (mine) {
@@ -957,7 +960,7 @@
             for (const type of PP.TRAINABLE) {
               const d = UN[type];
               const chk = g.trainCheck(p, c, type);
-              if (chk.locked) continue;
+              if (chk.locked || chk.unique) continue;
               acts.push(this.act('train', 'u_' + type, d.name, chk.cost + '★', { off: !chk.ok, reason: chk.ok ? '' : chk.reason, data: { type, city: c.id } }));
             }
             html += `<div class="sec-lbl">${PP.t('Recrutar')}</div><div class="acts">${acts.join('')}</div>`;
@@ -1271,7 +1274,7 @@
       const units = PP.TRAINABLE.map(type => {
         const d = UN[type];
         const chk = g.trainCheck(p, c, type);
-        if (chk.locked && (d.naval || d.spy)) return '';
+        if (d.character || (chk.locked && (d.naval || d.spy))) return ''; // personagens têm seção própria
         const needs = d.needs ? ' · ' + PP.t('requer {x}', { x: PP.STRATEGIC[d.needs].name }) : '';
         return `<button type="button" class="card ${chk.ok && my ? 'go' : ''} ${chk.locked ? 'locked' : ''}" data-m="train" data-city="${c.id}" data-v="${type}">
           <div class="card-row">${crest(p.color, 'u_' + type, 'crest-s')}<span class="cn">${d.name}</span></div>
@@ -1308,6 +1311,7 @@
           ${inc.notes && inc.notes.length ? `<p class="note">${esc(inc.notes.join(' · '))}</p>` : ''}
           ${bonus.length ? `<p class="note">${bonus.join(' · ')}</p>` : ''}
           ${this.citySections(c)}
+          ${this.realmCitySection ? this.realmCitySection(c) : ''}
           <div class="sec-lbl">${PP.t('Recrutar')}${g.unitAt(c.x, c.y) ? ' · ' + PP.t('a cidade precisa estar desocupada (navios nascem no porto)') : ''}</div><div class="grid">${units}</div>
           <div class="sec-lbl">${PP.t('Construções')}</div><div class="grid">${blds}</div>
         </div>`;
@@ -1321,11 +1325,11 @@
       const rows = list.map(c => {
         const inc = g.cityIncome(c);
         return `<div class="row">${crest(me.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-m')}
-          <div class="rt"><div class="rn">${esc(c.name)} · ${PP.t('nível {n}', { n: PP.roman(c.level) })}${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${g.cityStatus(c) ? ` <span class="tag bad">${g.cityStatus(c).name}</span>` : ''}</div><div class="rs">★ +${inc.stars} · ${SCI} +${inc.sci} · ${PP.t('{a}/{b} unidades', { a: g.cityUnits(c).length, b: g.capacity(c) })} · ${PP.t('população {a}/{b}', { a: c.pop, b: c.level + 1 })} · ${PP.t('lealdade {n}', { n: c.loyalty })}${g.routeSlots(c) ? ' · ' + PP.t('rotas {a}/{b}', { a: g.routesOf(c).length, b: g.routeSlots(c) }) : ''}</div></div>
+          <div class="rt"><div class="rn">${esc(c.name)} · ${PP.t('nível {n}', { n: PP.roman(c.level) })}${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${g.cityStatus(c) ? ` <span class="tag bad">${g.cityStatus(c).name}</span>` : ''}${this.realmCityTag ? this.realmCityTag(c) : ''}</div><div class="rs">★ +${inc.stars} · ${SCI} +${inc.sci} · ${PP.t('{a}/{b} unidades', { a: g.cityUnits(c).length, b: g.capacity(c) })} · ${PP.t('população {a}/{b}', { a: c.pop, b: c.level + 1 })} · ${PP.t('lealdade {n}', { n: c.loyalty })}${g.routeSlots(c) ? ' · ' + PP.t('rotas {a}/{b}', { a: g.routesOf(c).length, b: g.routeSlots(c) }) : ''}</div></div>
           <div class="ra"><button type="button" class="chip-btn" data-m="goto" data-city="${c.id}">${PP.t('Ir até lá')}</button></div></div>`;
       }).join('');
       this.openModal('cities', `<div class="modal-h"><div><h2>${PP.t('Suas cidades')}</h2><div class="sub">${PP.plural(list.length, PP.t('{n} cidade', { n: list.length }), PP.t('{n} cidades', { n: list.length }))}</div></div>${this.closeX()}</div>
-        <div class="modal-b"><div class="list">${rows || `<p class="note">${PP.t('Nenhuma cidade.')}</p>`}</div></div>`, { narrow: true });
+        <div class="modal-b">${this.realmSummary ? this.realmSummary() : ''}<div class="list">${rows || `<p class="note">${PP.t('Nenhuma cidade.')}</p>`}</div></div>`, { narrow: true });
     }
 
     // ---------------------------------------------------------- Tecnologia
@@ -1335,7 +1339,8 @@
       const inc = g.income(p);
       let html = `<div class="modal-h"><div><h2>${PP.t('Tecnologias')}</h2><div class="sub">${PP.t('{x} disponíveis', { x: `<b class="sci">${SCI} ${p.science}</b>` })} · ${PP.t('+{n} por turno', { n: inc.sci })} · ${PP.t('o custo cresce com o número de cidades')}</div></div>
         ${this.closeX()}</div><div class="modal-b">`;
-      for (let tier = 1; tier <= 4; tier++) {
+      const maxTier = Math.max(...PP.TECHS.map(t => t.tier));
+      for (let tier = 1; tier <= maxTier; tier++) {
         html += `<div class="era"><h3>${ERA()[tier]}</h3><div class="grid">`;
         for (const t of PP.TECHS.filter(x => x.tier === tier)) {
           const st = g.techState(p, t.id);
@@ -1595,6 +1600,12 @@
           ${p('Espiões (Espionagem) são invisíveis para quem não está colado neles. Ao lado de uma cidade estrangeira eles infiltram, roubam mapas, ciência ou tecnologias e sabotam a produção ou as estradas; o risco sobe com a Guarda da Cidade, torres e espiões do alvo. No mapa, casas vistas há pouco mostram as últimas tropas avistadas (inteligência recente).')}
           ${h('Eventos mundiais e marcos')}
           ${p('Secas, invernos, corridas do ouro, pragas, migrações, descobertas e tempestades são anunciados dois turnos antes e têm duração conhecida (chip no topo da tela). O mapa também tem pontos estratégicos: passos de montanha, estreitos, pontes antigas, portos naturais, minas abandonadas e ruínas imperiais.')}
+          ${h('Organização do reino')}
+          ${p('Cada reino governa bem um número limitado de cidades: a <b>capacidade administrativa</b> (4, mais Organização, Escrita, Código de Leis e Burocracia, Tribunais, Casas da Imprensa, Paços Regionais, a Chancelaria e o Governador). Cada cidade além disso causa <b>desordem</b>: −5% das estrelas e da ciência das cidades (máx. −25%).')}
+          ${p('As cidades também precisam estar ao <b>alcance da corte</b>: 7 casas da capital (9 com Chancelaria), 5 de um Paço Regional ou 4 da cidade do Governador; estrada ou porto até a capital encurta a distância em 2. Fora do alcance a cidade rende 20% menos (10% com Tribunal) e, se foi conquistada, perde lealdade. Partidas criadas antes desta versão não têm desordem nem distância.')}
+          ${h('Era V e personagens')}
+          ${p('A Era V (Impérios) traz Burocracia, Diplomacia Real, Arte da Guerra, Siderurgia e Imprensa, com Chancelaria, Paço Regional, Embaixada, Academia Militar, Fundição Real, Casa da Imprensa, o Dragão (atirador montado) e o Morteiro.')}
+          ${p('<b>Personagens</b> têm nome próprio e só pode haver um de cada por reino (marcados com uma estrela dourada): o <b>General</b> dá +20% de ataque e +10% de defesa às tropas vizinhas; o <b>Governador</b>, dentro ou ao lado de uma cidade sua, faz dela um centro administrativo (+2★, +10 de lealdade, +1 de capacidade); o <b>Embaixador</b>, no território de uma tribo em paz com você, rende +2 de opinião por turno e um relatório dela. Personagens não ocupam vaga nas cidades e não podem ser convertidos.')}
           ${h('Maravilhas')}
           ${p('Cada maravilha só pode ser construída uma vez no mundo, numa casa vazia do seu território. Todas dão +3 de população à cidade e 500 pontos, além do efeito próprio.')}
           ${h('Tribos')}<ul>${tribes}</ul>

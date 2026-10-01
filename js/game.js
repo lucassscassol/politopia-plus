@@ -262,6 +262,7 @@
     }
 
     checkMeet(p) {
+      if (this.loading) return; // ao carregar só se refaz a visão; os contatos novos acontecem na vez de cada um
       const vis = p.visible;
       for (let i = 0; i < vis.length; i++) {
         if (!vis[i]) continue;
@@ -1232,7 +1233,9 @@
       g.saveVersion = d.v || 1;
       g.hook('load', d.sys || {}, d);
       g.rebuildIndex();
+      g.loading = true;
       g.players.forEach(p => g.updateVision(p));
+      g.loading = false;
       g.hook('ready');
       return g;
     }

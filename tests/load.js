@@ -5,7 +5,7 @@ const path = require('path');
 const ENGINE = [
   'util', 'i18n', 'data', 'mapgen', 'game',
   'diplomacy', 'cities', 'economy', 'combat', 'naval', 'espionage', 'intel', 'events', 'ruins',
-  'victory', 'stats', 'achievements', 'replay', 'scenarios', 'ai-strategy', 'ai', 'lang/en', 'lang/es',
+  'victory', 'stats', 'achievements', 'replay', 'scenarios', 'realm', 'ai-strategy', 'ai', 'ai-realm', 'lang/en', 'lang/es',
 ];
 
 for (const m of ENGINE) {

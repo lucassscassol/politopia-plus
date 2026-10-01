@@ -63,10 +63,11 @@
     },
 
     // ------------------------------------------------------------ Grande Observatório
-    // Custo das etapas cresce com o tamanho do mapa (mapas maiores = partidas mais longas)
+    // Custo das etapas cresce com o tamanho do mapa (mapas maiores = impérios maiores e partidas mais longas).
+    // O expoente 1,5 acompanha a ciência dos impérios grandes nos mapas Colossal e Titânico; até 18×18 não muda nada.
     projectCost(stage) {
       const P = PP.SCIENCE_PROJECT;
-      return Math.round(P.stages[Math.min(stage, P.stages.length - 1)] * Math.max(1, this.W / 18) / 10) * 10;
+      return Math.round(P.stages[Math.min(stage, P.stages.length - 1)] * Math.pow(Math.max(1, this.W / 18), 1.5) / 10) * 10;
     },
 
     projectCheck(p, c) {

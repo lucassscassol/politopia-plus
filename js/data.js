@@ -45,7 +45,7 @@
   PP.ROUTES = { cost: { domestic: 3, foreign: 4 }, minDist: 3, maxLen: 18 };
 
   // ---------------------------------------------------------------- Tecnologias
-  PP.TECH_BASE = { 1: 4, 2: 7, 3: 11, 4: 16 };
+  PP.TECH_BASE = { 1: 4, 2: 7, 3: 11, 4: 16, 5: 22 };
   PP.TECHS = [
     { id: 'montaria',     tier: 1, req: [], name: 'Montaria',       icon: '🐎', desc: 'Unidade: Cavaleiro Leve' },
     { id: 'organizacao',  tier: 1, req: [], name: 'Organização',    icon: '📋', desc: 'Construção: Celeiro' },
@@ -72,12 +72,20 @@
     { id: 'filosofia',    tier: 3, req: ['meditacao'],    name: 'Filosofia',    icon: '🏛️', desc: 'Unidade: Missionário · tecnologias -15% · Grande Biblioteca' },
     { id: 'cartografia',  tier: 3, req: ['navegacao'],    name: 'Cartografia',  icon: '🧭', desc: 'Fragata · oceano · Caça à baleia · Maravilha: Colosso' },
     { id: 'espionagem',   tier: 3, req: ['escrita', 'estrategia'], name: 'Espionagem', icon: '🗡️', desc: 'Unidade: Espião · Guarda da Cidade' },
+    { id: 'codigo_leis',  tier: 3, req: ['escrita'],      name: 'Código de Leis', icon: '⚖️', desc: 'Tribunal · +1 de capacidade administrativa' },
 
     { id: 'polvora',      tier: 4, req: ['forja', 'matematica'],    name: 'Pólvora',          icon: '💥', desc: 'Mosqueteiro e Canhão (requerem Ferro)' },
     { id: 'eng_naval',    tier: 4, req: ['cartografia', 'forja'],   name: 'Engenharia Naval', icon: '⚓', desc: 'Couraçado (cidades portuárias, requer Ferro)' },
     { id: 'educacao',     tier: 4, req: ['filosofia', 'escrita'],   name: 'Educação',         icon: '🎓', desc: 'Universidade · Maravilha: Olho dos Deuses' },
     { id: 'economia',     tier: 4, req: ['comercio', 'escrita'],    name: 'Economia',         icon: '🏦', desc: 'Banco (+3★)' },
     { id: 'arquitetura',  tier: 4, req: ['construcao', 'matematica'], name: 'Arquitetura',    icon: '🏰', desc: 'Muralhas pela metade do preço · Fortaleza · Grande Muralha' },
+
+    // Era V · Impérios: governo dos reinos, diplomacia de corte, exércitos profissionais e personagens
+    { id: 'burocracia',      tier: 5, req: ['educacao', 'economia'],     name: 'Burocracia',      icon: '📑', desc: 'Chancelaria · Paço Regional · Personagem: Governador · +2 de capacidade administrativa' },
+    { id: 'diplomacia_real', tier: 5, req: ['educacao', 'espionagem'],   name: 'Diplomacia Real', icon: '🕊️', desc: 'Embaixada · Personagem: Embaixador' },
+    { id: 'arte_guerra',     tier: 5, req: ['polvora', 'cavalaria'],     name: 'Arte da Guerra',  icon: '🎖️', desc: 'Academia Militar · Unidade: Dragão (requer Cavalos) · Personagem: General' },
+    { id: 'siderurgia',      tier: 5, req: ['polvora', 'arquitetura'],   name: 'Siderurgia',      icon: '🔥', desc: 'Fundição Real · Unidade: Morteiro (requer Ferro)' },
+    { id: 'imprensa',        tier: 5, req: ['educacao', 'comercio'],     name: 'Imprensa',        icon: '📰', desc: 'Casa da Imprensa · bibliotecas +1⚗\uFE0E' },
   ];
   PP.TECH = {};
   PP.TECHS.forEach(t => { PP.TECH[t.id] = t; });
@@ -105,9 +113,16 @@
     frigate:   { name: 'Fragata',       icon: '🚢', cost: 9,  hp: 14, atk: 3,   def: 2, move: 3, range: 2, vision: 2, skills: ['dash', 'antinaval'], tech: 'cartografia', naval: true },
     ironclad:  { name: 'Couraçado',     icon: '🛳️', cost: 14, hp: 22, atk: 4.5, def: 4, move: 3, range: 2, vision: 2, skills: ['dash', 'antinaval'], tech: 'eng_naval', naval: true, needs: 'iron', portSpec: true },
     spy:       { name: 'Espião',        icon: '🗡️', cost: 6,  hp: 6,  atk: 0,   def: 1, move: 2, range: 1, vision: 2, skills: ['stealth', 'escape', 'creep', 'stiff'], tech: 'espionagem', spy: true },
+    // Era V
+    dragoon:   { name: 'Dragão',        icon: '🐎', cost: 11, hp: 15, atk: 3.5, def: 2, move: 2, range: 2, vision: 1, skills: ['dash', 'escape'], mounted: true, tech: 'arte_guerra', needs: 'horses' },
+    mortar:    { name: 'Morteiro',      icon: '💣', cost: 14, hp: 10, atk: 6,   def: 1, move: 1, range: 3, vision: 1, skills: ['stiff', 'splash'], tech: 'siderurgia', needs: 'iron' },
+    // Personagens: um de cada por reino, com nome próprio; não ocupam vaga na capacidade da cidade (js/realm.js)
+    general:   { name: 'General',       icon: '🎖️', cost: 12, hp: 16, atk: 2,   def: 2, move: 2, range: 1, vision: 2, skills: ['dash', 'escape', 'aura'], tech: 'arte_guerra', character: true, building: 'war_academy' },
+    governor:  { name: 'Governador',    icon: '📜', cost: 10, hp: 10, atk: 0,   def: 1, move: 2, range: 1, vision: 1, skills: ['stiff', 'govern'], tech: 'burocracia', character: true },
+    envoy:     { name: 'Embaixador',    icon: '🕊️', cost: 8,  hp: 8,  atk: 0,   def: 1, move: 3, range: 1, vision: 2, skills: ['stiff', 'creep', 'envoy'], tech: 'diplomacia_real', character: true },
   };
   PP.TRAINABLE = ['warrior', 'scout', 'rider', 'archer', 'defender', 'pikeman', 'swordsman', 'catapult', 'knight', 'missionary', 'musketeer', 'cannon',
-    'spy', 'scout_ship', 'transport', 'frigate', 'ironclad'];
+    'dragoon', 'mortar', 'spy', 'scout_ship', 'transport', 'frigate', 'ironclad', 'general', 'governor', 'envoy'];
 
   // Unidades em água viram embarcações; o nível depende da melhor tecnologia naval do dono.
   PP.NAVAL = [
@@ -123,11 +138,14 @@
     heal: 'Curar aliados', convert: 'Converter inimigos', antimount: 'Anti-montaria (x2 def / x1,5 atq vs montados)',
     antinaval: 'Caça-navios (+50% de ataque contra alvos na água)', stealth: 'Furtivo (invisível a quem não estiver ao lado)',
     cargo: 'Carga (transporta tropas terrestres)',
+    aura: 'Comando (aliados vizinhos +20% de ataque e +10% de defesa)',
+    govern: 'Governo (ao lado ou dentro de uma cidade sua, faz dela um centro administrativo)',
+    envoy: 'Missão diplomática (no território de quem está em paz com você: +2 de opinião por turno e relatório da tribo)',
   };
 
   // Habilidades ativas: o jogador decide quando usar; cada uma tem recarga em turnos
   PP.ABILITIES = {
-    aim:       { name: 'Tiro Preciso', icon: 'ab_aim', units: ['archer', 'musketeer'], cd: 3, before: true,
+    aim:       { name: 'Tiro Preciso', icon: 'ab_aim', units: ['archer', 'musketeer', 'dragoon'], cd: 3, before: true,
       desc: 'Antes de mover: +1 de alcance e +50% de dano no próximo tiro. A unidade não se move mais neste turno.' },
     charge:    { name: 'Carga', icon: 'ab_charge', units: ['rider', 'knight'], cd: 4, before: true,
       desc: '+2 de movimento neste turno e +40% de dano no próximo ataque.' },
@@ -135,7 +153,7 @@
       desc: 'Até o seu próximo turno: +25% de defesa e inimigos vizinhos só podem atacar esta unidade. Encerra o turno.' },
     phalanx:   { name: 'Formação Cerrada', icon: 'ab_phalanx', units: ['pikeman', 'swordsman'], cd: 3,
       desc: 'Até o seu próximo turno: aliados vizinhos ganham +20% de defesa. Encerra o turno.' },
-    bombard:   { name: 'Bombardeio', icon: 'ab_bombard', units: ['catapult', 'cannon'], cd: 3, before: true,
+    bombard:   { name: 'Bombardeio', icon: 'ab_bombard', units: ['catapult', 'cannon', 'mortar'], cd: 3, before: true,
       desc: 'Antes de mover: +1 de alcance e o próximo tiro atinge as casas vizinhas com 50% do dano. Não se move depois.' },
     bless:     { name: 'Bênção', icon: 'ab_bless', units: ['missionary'], cd: 3,
       desc: 'Aliados vizinhos curam 3 e ganham +20% de ataque e defesa até o seu próximo turno.' },
@@ -216,6 +234,14 @@
     university: { name: 'Universidade', icon: '🎓', cost: 12, tech: 'educacao', desc: '+3⚗\uFE0E por turno (requer Biblioteca)', sci: 3, needs: 'library' },
     bank:       { name: 'Banco',        icon: '🏦', cost: 12, tech: 'economia', desc: '+3★ por turno', gold: 3 },
     guard:      { name: 'Guarda da Cidade', icon: '💂', cost: 5, tech: 'espionagem', desc: '+40% de chance de capturar espiões · +5 de lealdade' },
+    // Organização do reino e Era V (efeitos em js/realm.js; admin = capacidade administrativa dada)
+    tribunal:      { name: 'Tribunal',         cost: 7,  tech: 'codigo_leis',     admin: 1, desc: '+1 de capacidade administrativa · +10 de lealdade · metade da penalidade de distância da corte' },
+    chancery:      { name: 'Chancelaria',      cost: 14, tech: 'burocracia',      admin: 3, capitalOnly: true, desc: 'Só na capital · +3 de capacidade administrativa · alcance da capital +2' },
+    regional_seat: { name: 'Paço Regional',    cost: 12, tech: 'burocracia',      admin: 2, desc: 'A cidade vira sede de província (alcance 5) · +2 de capacidade administrativa · +5 de lealdade na província' },
+    embassy:       { name: 'Embaixada',        cost: 10, tech: 'diplomacia_real', unique: true, desc: 'Uma por reino · +1 de opinião por turno com as tribos em paz com você (máx. +10)' },
+    war_academy:   { name: 'Academia Militar', cost: 12, tech: 'arte_guerra',     desc: 'Recrutas +1 XP · +1 capacidade · permite recrutar o General' },
+    foundry:       { name: 'Fundição Real',    cost: 10, tech: 'siderurgia',      desc: '+2★ por turno · unidades que usam Ferro custam −1★ nesta cidade' },
+    press:         { name: 'Casa da Imprensa', cost: 10, tech: 'imprensa',        admin: 1, desc: '+2⚗\uFE0E por turno · +5 de lealdade · +1 de capacidade administrativa' },
     // Exclusivas de especialização (só funcionam enquanto a cidade mantém a especialização)
     arsenal:      { spec: 'militar',  name: 'Arsenal',          cost: 8,  tech: 'forja',       desc: 'Recrutas custam −1★ a mais e nascem com +1 XP' },
     citadel:      { spec: 'militar',  name: 'Cidadela',         cost: 10, tech: 'estrategia',  needs: 'walls', desc: 'Defesa ×4 na cidade · cura +3 · +10 de lealdade' },
@@ -230,6 +256,7 @@
     customs:      { spec: 'porto',    name: 'Alfândega',        cost: 10, tech: 'comercio',    desc: '+1★ por porto, peixe ou baleia no território (máx. 4) · +1 vaga de rota' },
   };
   PP.BUILDING_ORDER = ['walls', 'barracks', 'granary', 'library', 'temple', 'university', 'bank', 'guard',
+    'tribunal', 'chancery', 'regional_seat', 'embassy', 'war_academy', 'foundry', 'press',
     'arsenal', 'citadel', 'observatory', 'academy_hall', 'guild', 'exchange', 'silos', 'aqueduct', 'shipyard', 'lighthouse', 'customs'];
 
   // ---------------------------------------------------------------- Especialização de cidades
@@ -332,7 +359,7 @@
     dois_continentes: { name: 'Dois Continentes', land: 0.5, hidden: true },
     ilhas:            { name: 'Ilhas',            land: 0.34, hidden: true },
   };
-  PP.MAP_SIZES = { 14: 'Pequeno (14×14)', 18: 'Médio (18×18)', 22: 'Grande (22×22)', 26: 'Enorme (26×26)' };
+  PP.MAP_SIZES = { 14: 'Pequeno (14×14)', 18: 'Médio (18×18)', 22: 'Grande (22×22)', 26: 'Enorme (26×26)', 32: 'Colossal (32×32)', 40: 'Titânico (40×40)' };
 
   // ---------------------------------------------------------------- Tribos
   PP.TRIBES = {

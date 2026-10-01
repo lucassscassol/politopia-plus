@@ -4,6 +4,9 @@
   const UN = PP.UNITS;
   const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   const AI = {};
+  // Pontos de extensão para módulos de IA de outros sistemas (ex.: js/ai-realm.js): techValue, buildingValue,
+  // techMult, spendOptions e actCharacter. Cada um é opcional.
+  AI.ext = {};
 
   // ------------------------------------------------------------ Decisões pontuais (chamadas pelo motor)
   AI.chooseReward = function (g, p, c, options) {
@@ -184,7 +187,7 @@
         }
         let best = null, bv = -1;
         for (const t of avail) {
-          const v = this.techValue(t) * this.techStrategyMult(t) / g.techCost(p, t.id) * (0.8 + g.rng.next() * 0.4);
+          const v = this.techValue(t) * this.techStrategyMult(t) * (AI.ext.techMult ? AI.ext.techMult(this, t) : 1) / g.techCost(p, t.id) * (0.8 + g.rng.next() * 0.4);
           if (v > bv) { bv = v; best = t; }
         }
         if (!best || p.science < g.techCost(p, best.id)) return;
@@ -268,6 +271,7 @@
         case 'arquitetura': return 3.5;
         case 'espionagem': return 1.5 + (this.analysis && this.analysis.wars ? 1.5 : 0) + (this.strategy === 'ciencia' ? 1 : 0);
       }
+      if (AI.ext.techValue) { const v = AI.ext.techValue(this, t); if (v != null) return v; }
       return 2;
     }
 
@@ -277,6 +281,7 @@
       const order = u => {
         if (g.canCapture(u)) return 0;
         const d = UN[u.type];
+        if (d.character) return 5; // personagens se posicionam depois das tropas
         if (d.spy) return 4;
         if (d.range > 1) return 1;
         if (d.skills.indexOf('convert') >= 0) return 3;
@@ -350,6 +355,7 @@
       if (u.pendingPromo) AI.autoPromote(g, u);
       const thr = this.attackThreshold();
       if (UN[u.type].spy) { await this.actSpy(u, pause); return; }
+      if (UN[u.type].character && AI.ext.actCharacter) { await AI.ext.actCharacter(this, u, pause); return; }
 
       // 1) Capturar
       if (g.canCapture(u)) { g.capture(u); await pause('capture', u); return; }
@@ -839,6 +845,7 @@
             case 'shipyard': v = this.needsBoats ? 1.5 : 0.6; break;
             case 'lighthouse': v = 0.8; break;
             case 'customs': v = 2.5; break;
+            default: v = AI.ext.buildingValue ? AI.ext.buildingValue(this, c, id, chk) || 0 : 0;
           }
           if (strat === 'ciencia' && ['library', 'university', 'observatory', 'academy_hall'].indexOf(id) >= 0) v *= 1.4;
           if (strat === 'economia' && ['bank', 'guild', 'exchange', 'customs'].indexOf(id) >= 0) v *= 1.4;
@@ -881,6 +888,7 @@
           if (c) out.push({ score: 0.3, cost: g.unitCostFor(p, c, 'spy'), exec: () => !!g.train(p, c, 'spy') });
         }
       }
+      if (AI.ext.spendOptions) AI.ext.spendOptions(this, out);
       return out;
     }
 
@@ -896,7 +904,7 @@
       const W = {
         warrior: 1, scout: g.turn < 18 && scouts < 1 ? 2.5 : 0, rider: 2 * this.aggr, archer: 1.8 + (th ? 1 : 0),
         defender: th ? 4 : 1, pikeman: mountedEnemies ? 3 : 1, swordsman: 3 * this.aggr, catapult: 1.3 * this.aggr,
-        knight: 3.5 * this.aggr, missionary: 0.5, musketeer: 4, cannon: 1.5 * this.aggr,
+        knight: 3.5 * this.aggr, missionary: 0.5, musketeer: 4, cannon: 1.5 * this.aggr, dragoon: 3.5 * this.aggr, mortar: 1.6 * this.aggr,
         spy: 0, transport: 0,
         scout_ship: navalWant > 0 && ships < 1 ? 1.2 : 0, frigate: navalWant * (ships < 4 ? 1 : 0.3), ironclad: navalWant * 1.3,
       };
@@ -904,6 +912,7 @@
       const opts = [];
       for (const t of PP.TRAINABLE) {
         if (navalOnly && !UN[t].naval) continue;
+        if (UN[t].character) continue; // personagens são recrutados à parte (AI.ext.spendOptions)
         if (!W[t] && W[t] !== undefined) continue;
         const chk = g.trainCheck(p, c, t);
         if (!chk.ok && chk.reason !== PP.t('Faltam estrelas')) continue;

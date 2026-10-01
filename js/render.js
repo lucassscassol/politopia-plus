@@ -1322,6 +1322,19 @@
           }
         }
       }
+      // personagem (General, Governador, Embaixador): estrela dourada sobre o escudo
+      if (PP.UNITS[u.type].character) {
+        const sy = y - 28 - (rank > 0 ? rank * 4.5 + 1 : 0);
+        ctx.beginPath();
+        for (let k = 0; k < 10; k++) {
+          const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 3 : 7;
+          const px = x + Math.cos(a) * r, py = sy + Math.sin(a) * r;
+          if (k) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+        ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+        ctx.fillStyle = '#e8c56d'; ctx.fill();
+      }
       if (u.pendingPromo && u.owner === this.viewer) {
         ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x + 17, y - 17, 7, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(x + 17, y - 17, 5.5, 0, Math.PI * 2); ctx.fill();
