@@ -96,18 +96,18 @@
         const m = PP.SPY_MISSIONS[id];
         const r = { id, def: m, ok: false, reason: '', risk: 0, target: null };
         if (m.city) {
-          if (!c) { r.reason = 'Fique ao lado de uma cidade estrangeira'; out.push(r); continue; }
+          if (!c) { r.reason = PP.t('Fique ao lado de uma cidade estrangeira'); out.push(r); continue; }
           r.target = c;
-          if (id === 'steal_tech' && !this.stealableTechs(this.players[u.owner], this.players[c.owner]).length) { r.reason = 'Nada a aprender com eles'; out.push(r); continue; }
-          if (id === 'steal_sci' && this.players[c.owner].science < 2) { r.reason = 'Eles não têm ciência guardada'; out.push(r); continue; }
-          if (id === 'sabotage_city' && c.sabotage > 0) { r.reason = 'Já sabotada'; out.push(r); continue; }
+          if (id === 'steal_tech' && !this.stealableTechs(this.players[u.owner], this.players[c.owner]).length) { r.reason = PP.t('Nada a aprender com eles'); out.push(r); continue; }
+          if (id === 'steal_sci' && this.players[c.owner].science < 2) { r.reason = PP.t('Eles não têm ciência guardada'); out.push(r); continue; }
+          if (id === 'sabotage_city' && c.sabotage > 0) { r.reason = PP.t('Já sabotada'); out.push(r); continue; }
         } else {
-          if (!t.road || t.owner === u.owner || t.owner < 0 || (this.allied && this.allied(t.owner, u.owner))) { r.reason = 'Precisa estar numa estrada de outra tribo'; out.push(r); continue; }
+          if (!t.road || t.owner === u.owner || t.owner < 0 || (this.allied && this.allied(t.owner, u.owner))) { r.reason = PP.t('Precisa estar numa estrada de outra tribo'); out.push(r); continue; }
           r.target = t;
         }
         r.risk = this.spyRisk(u, id, r.target);
-        if (!u.canAttack || u.attacked) { r.reason = 'O espião já agiu neste turno'; out.push(r); continue; }
-        if (u.owner !== this.current) { r.reason = 'Fora do turno'; out.push(r); continue; }
+        if (!u.canAttack || u.attacked) { r.reason = PP.t('O espião já agiu neste turno'); out.push(r); continue; }
+        if (u.owner !== this.current) { r.reason = PP.t('Fora do turno'); out.push(r); continue; }
         r.ok = true;
         out.push(r);
       }
@@ -132,8 +132,8 @@
       if (caught) {
         this.remember(victimId, p.id, 'spy_caught');
         victim.stats.spiesCaught = (victim.stats.spiesCaught || 0) + 1;
-        this.log(`${victim.name} capturou um espião de ${p.name}!`, [p.id, victimId]);
-        res.text = 'O espião foi capturado.';
+        this.log(PP.t('{v} capturou um espião de {p}!', { v: victim.name, p: p.name }), [p.id, victimId]);
+        res.text = PP.t('O espião foi capturado.');
         this.killUnit(u, null);
         this.emit('spy', res);
         this.refreshVision(p.id);
@@ -144,20 +144,20 @@
           p.intel = p.intel || {};
           p.intel[victimId] = this.intelReport(p.id, victimId);
           this.reveal(p, target.x, target.y, 3);
-          res.text = `Relatório de ${victim.name} obtido.`;
+          res.text = PP.t('Relatório de {v} obtido.', { v: victim.name });
           break;
         }
         case 'reveal': {
           for (let i = 0; i < this.tiles.length; i++) if (victim.explored[i] && this.tiles[i].owner === victimId) p.explored[i] = 1;
           for (let i = 0; i < this.tiles.length; i++) if (victim.explored[i] && this.rng.chance(0.5)) p.explored[i] = 1;
-          res.text = `Mapas de ${victim.name} copiados.`;
+          res.text = PP.t('Mapas de {v} copiados.', { v: victim.name });
           break;
         }
         case 'steal_sci': {
           const amt = Math.min(12, Math.max(1, Math.floor(victim.science * 0.25)));
           victim.science -= amt; p.science += amt;
-          res.text = `+${amt}⚗ roubados de ${victim.name}.`;
-          this.log(`Espiões roubaram ${amt}⚗ de ${victim.name}.`, victimId);
+          res.text = PP.t('+{n}⚗ roubados de {v}.', { n: amt, v: victim.name });
+          this.log(PP.t('Espiões roubaram {n}⚗ de {v}.', { n: amt, v: victim.name }), victimId);
           break;
         }
         case 'steal_tech': {
@@ -166,13 +166,13 @@
           p.techs[tc.id] = true;
           this.hook('tech', p, tc.id);
           this.emit('tech', { player: p.id, tech: tc.id });
-          res.text = `Tecnologia descoberta: ${tc.name}.`;
+          res.text = PP.t('Tecnologia descoberta: {t}.', { t: tc.name });
           break;
         }
         case 'sabotage_city': {
           target.sabotage = 3;
-          res.text = `${target.name} sabotada por 3 turnos.`;
-          this.log(`Sabotadores atacaram a produção de ${target.name}.`, victimId);
+          res.text = PP.t('{c} sabotada por 3 turnos.', { c: target.name });
+          this.log(PP.t('Sabotadores atacaram a produção de {c}.', { c: target.name }), victimId);
           break;
         }
         case 'sabotage_road': {
@@ -183,13 +183,13 @@
             if (t.road && t.owner === owner) { t.road = false; n++; }
           }
           this.invalidate();
-          res.text = `${n} trecho(s) de estrada destruídos.`;
-          this.log(`Sabotadores destruíram estradas de ${victim.name}.`, victimId);
+          res.text = PP.t('{n} trecho(s) de estrada destruídos.', { n });
+          this.log(PP.t('Sabotadores destruíram estradas de {v}.', { v: victim.name }), victimId);
           break;
         }
       }
       this.gainXp(u, 1);
-      this.log(`${p.name}: missão "${m.def.name}" concluída. ${res.text}`, p.id);
+      this.log(PP.t('{p}: missão "{m}" concluída. {r}', { p: p.name, m: m.def.name, r: res.text }), p.id);
       this.emit('spy', res);
       this.refreshVision(p.id);
       return res;

@@ -74,16 +74,16 @@
       const P = PP.SCIENCE_PROJECT;
       const stage = p.project.stage;
       const r = { ok: false, reason: '', cost: this.projectCost(stage), stage };
-      if (!this.victoryEnabled('ciencia')) { r.reason = 'Vitória científica desativada'; r.hidden = true; return r; }
-      if (stage >= P.stages.length) { r.reason = 'Concluído'; return r; }
-      if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
-      if (c.spec !== 'ciencia') { r.reason = 'Exige cidade Científica'; return r; }
-      if (c.level < P.minLevel) { r.reason = `Exige cidade de nível ${P.minLevel}`; return r; }
-      if (!this.has(p, P.tech)) { r.reason = 'Requer ' + PP.TECH[P.tech].name; r.locked = true; return r; }
+      if (!this.victoryEnabled('ciencia')) { r.reason = PP.t('Vitória científica desativada'); r.hidden = true; return r; }
+      if (stage >= P.stages.length) { r.reason = PP.t('Concluído'); return r; }
+      if (!c || c.owner !== p.id) { r.reason = PP.t('Cidade inválida'); return r; }
+      if (c.spec !== 'ciencia') { r.reason = PP.t('Exige cidade {x}', { x: PP.SPECS.ciencia.name }); return r; }
+      if (c.level < P.minLevel) { r.reason = PP.t('Exige cidade de nível {n}', { n: P.minLevel }); return r; }
+      if (!this.has(p, P.tech)) { r.reason = PP.t('Requer {x}', { x: PP.TECH[P.tech].name }); r.locked = true; return r; }
       const n = Object.keys(p.techs).length;
-      if (n < P.minTechs) { r.reason = `Requer a árvore completa (${n}/${P.minTechs})`; r.locked = true; return r; }
-      if (p.project.last >= 0 && this.turn - p.project.last < P.gap) { r.reason = `Próxima etapa no turno ${p.project.last + P.gap}`; return r; }
-      if (p.science < r.cost) { r.reason = 'Falta ciência'; return r; }
+      if (n < P.minTechs) { r.reason = PP.t('Requer a árvore completa ({n}/{m})', { n, m: P.minTechs }); r.locked = true; return r; }
+      if (p.project.last >= 0 && this.turn - p.project.last < P.gap) { r.reason = PP.t('Próxima etapa no turno {n}', { n: p.project.last + P.gap }); return r; }
+      if (p.science < r.cost) { r.reason = PP.t('Falta ciência'); return r; }
       r.ok = true;
       return r;
     },
@@ -97,7 +97,7 @@
       p.project.last = this.turn;
       p.project.city = c.id;
       const P = PP.SCIENCE_PROJECT;
-      this.log(`${p.name} concluiu a etapa ${p.project.stage}/${P.stages.length} do ${P.name} em ${c.name}!`, null);
+      this.log(PP.t('{p} concluiu a etapa {s}/{n} do {x} em {c}!', { p: p.name, s: p.project.stage, n: P.stages.length, x: P.name, c: c.name }), null);
       this.emit('project', { player: p.id, stage: p.project.stage, city: c });
       if (p.project.stage >= P.stages.length) this.finish(p.id, 'ciencia');
       return true;
@@ -116,21 +116,21 @@
           const share = this.landShare(p.id);
           if (share >= this.territoryGoal()) {
             h.territorio = (h.territorio || 0) + 1;
-            if (h.territorio === 1) this.log(`${p.name} controla ${Math.round(share * 100)}% das terras! Vitória territorial em ${PP.TERRITORY_HOLD} turnos.`, null);
+            if (h.territorio === 1) this.log(PP.t('{p} controla {n}% das terras! Vitória territorial em {m} turnos.', { p: p.name, n: Math.round(share * 100), m: PP.TERRITORY_HOLD }), null);
             if (h.territorio >= PP.TERRITORY_HOLD) { this.finish(p.id, 'territorio'); return; }
           } else h.territorio = 0;
         }
         if (this.victoryEnabled('maravilhas')) {
           if (this.wondersOwned(p.id) >= PP.WONDERS_TO_WIN) {
             h.maravilhas = (h.maravilhas || 0) + 1;
-            if (h.maravilhas === 1) this.log(`${p.name} reúne ${PP.WONDERS_TO_WIN} maravilhas! Vitória em ${PP.WONDER_HOLD} turnos se ninguém tomar as cidades delas.`, null);
+            if (h.maravilhas === 1) this.log(PP.t('{p} reúne {n} maravilhas! Vitória em {m} turnos se ninguém tomar as cidades delas.', { p: p.name, n: PP.WONDERS_TO_WIN, m: PP.WONDER_HOLD }), null);
             if (h.maravilhas >= PP.WONDER_HOLD) { this.finish(p.id, 'maravilhas'); return; }
           } else h.maravilhas = 0;
         }
         if (this.victoryEnabled('diplomacia')) {
           if (this.diplomaticStanding(p.id).ok) {
             h.diplomacia = (h.diplomacia || 0) + 1;
-            if (h.diplomacia === 1) this.log(`${p.name} lidera uma grande aliança! Vitória diplomática em ${PP.HOLD_TURNS} turnos.`, null);
+            if (h.diplomacia === 1) this.log(PP.t('{p} lidera uma grande aliança! Vitória diplomática em {m} turnos.', { p: p.name, m: PP.HOLD_TURNS }), null);
             if (h.diplomacia >= PP.HOLD_TURNS) { this.finish(p.id, 'diplomacia'); return; }
           } else h.diplomacia = 0;
         }
@@ -150,38 +150,38 @@
       const out = [];
       const add = (id, pct, text) => out.push(Object.assign({ id, pct: Math.max(0, Math.min(1, pct)), text }, PP.VICTORIES[id]));
       const alive = this.players.filter(q => q.alive);
-      add('dominacao', 1 - (alive.length - 1) / Math.max(1, this.players.length - 1), `${alive.length - 1} rival(is) restante(s)`);
+      add('dominacao', 1 - (alive.length - 1) / Math.max(1, this.players.length - 1), PP.t('{n} rival(is) restante(s)', { n: alive.length - 1 }));
       if (this.victoryEnabled('pontos')) {
         const best = alive.slice().sort((a, b) => this.score(b) - this.score(a))[0];
-        add('pontos', this.turn / this.opts.turnLimit, `Turno ${this.turn}/${this.opts.turnLimit} · líder: ${best ? best.name : '—'}`);
+        add('pontos', this.turn / this.opts.turnLimit, PP.t('Turno {n}/{m} · líder: {p}', { n: this.turn, m: this.opts.turnLimit, p: best ? best.name : '—' }));
       }
       if (this.victoryEnabled('ciencia')) {
         const P = PP.SCIENCE_PROJECT, n = Object.keys(p.techs).length;
         const pre = Math.min(1, n / P.minTechs);
         add('ciencia', p.project.stage ? 0.4 + 0.6 * p.project.stage / P.stages.length : pre * 0.4,
-          p.project.stage ? `${P.name}: etapa ${p.project.stage}/${P.stages.length}` : `${Math.min(n, P.minTechs)}/${P.minTechs} tecnologias`);
+          p.project.stage ? PP.t('{x}: etapa {s}/{n}', { x: P.name, s: p.project.stage, n: P.stages.length }) : PP.t('{n}/{m} tecnologias', { n: Math.min(n, P.minTechs), m: P.minTechs }));
       }
       if (this.victoryEnabled('economia')) {
         const goal = this.economicGoal(), cur = p.stats.tradeIncome || 0;
-        add('economia', cur / goal, `${cur}/${goal}★ em rotas${this.hasForeignRoute(p.id) ? '' : ' · falta rota com outra tribo'}`);
+        add('economia', cur / goal, PP.t('{n}/{m}★ em rotas', { n: cur, m: goal }) + (this.hasForeignRoute(p.id) ? '' : ' · ' + PP.t('falta rota com outra tribo')));
       }
       if (this.victoryEnabled('maravilhas')) {
         const n = this.wondersOwned(p.id);
         add('maravilhas', Math.min(1, n / PP.WONDERS_TO_WIN) * 0.8 + (p.vhold.maravilhas || 0) / PP.WONDER_HOLD * 0.2,
-          `${n}/${PP.WONDERS_TO_WIN} maravilhas` + (p.vhold.maravilhas ? ` · ${p.vhold.maravilhas}/${PP.WONDER_HOLD} turnos` : ''));
+          PP.t('{n}/{m} maravilhas', { n, m: PP.WONDERS_TO_WIN }) + (p.vhold.maravilhas ? ' · ' + PP.t('{n}/{m} turnos', { n: p.vhold.maravilhas, m: PP.WONDER_HOLD }) : ''));
       }
       if (this.victoryEnabled('territorio')) {
         const s = this.landShare(p.id), goal = this.territoryGoal();
         add('territorio', Math.min(1, s / goal) * 0.8 + (p.vhold.territorio || 0) / PP.TERRITORY_HOLD * 0.2,
-          `${Math.round(s * 100)}% de ${Math.round(goal * 100)}% das terras` + (p.vhold.territorio ? ` · ${p.vhold.territorio}/${PP.TERRITORY_HOLD} turnos` : ''));
+          PP.t('{n}% de {m}% das terras', { n: Math.round(s * 100), m: Math.round(goal * 100) }) + (p.vhold.territorio ? ' · ' + PP.t('{n}/{m} turnos', { n: p.vhold.territorio, m: PP.TERRITORY_HOLD }) : ''));
       }
       if (this.victoryEnabled('diplomacia')) {
         const d = this.diplomaticStanding(p.id);
         add('diplomacia', (Math.min(d.allies, d.need) / Math.max(1, d.need)) * 0.7 + (p.vhold.diplomacia || 0) / PP.HOLD_TURNS * 0.3,
-          `${d.allies}/${d.need} alianças · ${d.wars} guerra(s) · reputação ${d.rep}` + (p.vhold.diplomacia ? ` · ${p.vhold.diplomacia}/${PP.HOLD_TURNS} turnos` : ''));
+          PP.t('{a}/{b} alianças · {w} guerra(s) · reputação {r}', { a: d.allies, b: d.need, w: d.wars, r: d.rep }) + (p.vhold.diplomacia ? ' · ' + PP.t('{n}/{m} turnos', { n: p.vhold.diplomacia, m: PP.HOLD_TURNS }) : ''));
       }
       if (this.victoryEnabled('sobrevivencia') && this.opts.surviveTurns) {
-        add('sobrevivencia', this.turn / this.opts.surviveTurns, `Turno ${this.turn}/${this.opts.surviveTurns}`);
+        add('sobrevivencia', this.turn / this.opts.surviveTurns, PP.t('Turno {n}/{m}', { n: this.turn, m: this.opts.surviveTurns }));
       }
       return out;
     },
@@ -210,9 +210,9 @@
   Object.assign(PP.Game.prototype, V);
 
   PP.victoryLabel = function (reason) {
-    if (reason === 'derrota') return 'Derrota';
-    const v = PP.VICTORIES[reason];
-    return v ? 'Vitória ' + (reason === 'pontos' ? 'por pontos' : v.name === 'Dominação' ? 'por dominação' : v.name.toLowerCase()) : reason;
+    const L = { derrota: 'Derrota', dominacao: 'Vitória por dominação', pontos: 'Vitória por pontos', ciencia: 'Vitória científica', economia: 'Vitória econômica',
+      maravilhas: 'Vitória por maravilhas', territorio: 'Vitória territorial', diplomacia: 'Vitória diplomática', sobrevivencia: 'Vitória por sobrevivência' };
+    return L[reason] ? PP.t(L[reason]) : reason;
   };
 
   PP.registerSystem('victory', {

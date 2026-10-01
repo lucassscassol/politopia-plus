@@ -77,13 +77,13 @@
     newRound(g) { g.recordFrame(); },
     gameover(g, winner, reason) {
       g.recordFrame();
-      g.mark(winner >= 0 ? `${g.players[winner].name}: ${PP.victoryLabel ? PP.victoryLabel(reason) : reason}` : 'Fim de jogo', 'end');
+      g.mark(winner >= 0 ? `${g.players[winner].name}: ${PP.victoryLabel ? PP.victoryLabel(reason) : reason}` : PP.t('Fim de jogo'), 'end');
     },
-    capture(g, c, old, p) { g.mark(`${p.name} conquistou ${c.name} de ${old.name}`, 'capture'); },
-    found(g, c, p) { g.mark(`${p.name} fundou ${c.name}`, 'found'); },
-    war(g, a, b) { g.mark(`${g.players[a].name} declarou guerra a ${g.players[b].name}`, 'war'); },
+    capture(g, c, old, p) { g.mark(PP.t('{p} conquistou {c} de {o}', { p: p.name, c: c.name, o: old.name }), 'capture'); },
+    found(g, c, p) { g.mark(PP.t('{p} fundou {c}', { p: p.name, c: c.name }), 'found'); },
+    war(g, a, b) { g.mark(PP.t('{a} declarou guerra a {b}', { a: g.players[a].name, b: g.players[b].name }), 'war'); },
     treaty(g, a, b, type) { g.mark(`${g.players[a].name} e ${g.players[b].name}: ${PP.RELATIONS[type] ? PP.RELATIONS[type].name : type}`, 'treaty'); },
-    wonder(g, p, wid) { g.mark(`${p.name} construiu ${PP.WONDERS[wid].name}`, 'wonder'); },
-    eliminated(g, p) { g.mark(`${p.name} foi eliminado`, 'eliminated'); },
+    wonder(g, p, wid) { g.mark(PP.t('{p} construiu {w}', { p: p.name, w: PP.WONDERS[wid].name }), 'wonder'); },
+    eliminated(g, p) { g.mark(PP.t('{p} foi eliminado', { p: p.name }), 'eliminated'); },
   });
 })(typeof globalThis !== 'undefined' ? (globalThis.PP = globalThis.PP || {}) : (window.PP = window.PP || {}));

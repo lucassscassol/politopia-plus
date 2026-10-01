@@ -143,7 +143,7 @@
         n = n.charAt(0).toUpperCase() + n.slice(1);
         if (n.length >= 3 && !this.usedNames[n]) { this.usedNames[n] = 1; return n; }
       }
-      return 'Vila ' + this.nextId;
+      return PP.t('Vila {n}', { n: this.nextId });
     }
 
     createCity(owner, x, y, capital) {
@@ -275,7 +275,7 @@
 
     meet(a, b) {
       a.met[b.id] = true; b.met[a.id] = true;
-      this.log(`${a.name} encontrou ${b.name}.`, [a.id, b.id]);
+      this.log(PP.t('{a} encontrou {b}.', { a: a.name, b: b.name }), [a.id, b.id]);
       this.emit('meet', { a: a.id, b: b.id });
       this.hook('met', a, b);
     }
@@ -435,7 +435,7 @@
       let text = '';
       if (r === 'tech') {
         const opts = PP.TECHS.filter(tc => !p.techs[tc.id] && tc.tier <= 3 && tc.req.every(q => p.techs[q]));
-        if (opts.length) { const tc = this.rng.pick(opts); p.techs[tc.id] = true; text = `descobriu a tecnologia ${tc.name}!`; this.emit('tech', { player: p.id, tech: tc.id }); }
+        if (opts.length) { const tc = this.rng.pick(opts); p.techs[tc.id] = true; text = PP.t('descobriu a tecnologia {t}!', { t: tc.name }); this.emit('tech', { player: p.id, tech: tc.id }); }
         else r = 'stars';
       }
       if (r === 'unit') {
@@ -444,19 +444,19 @@
           const nu = this.createUnit('swordsman', p.id, spot.x, spot.y, null);
           nu.xp = PP.XP_LEVELS[0]; nu.pendingPromo = 1;
           if (!p.human && PP.AI) PP.AI.autoPromote(this, nu);
-          text = 'encontrou um Espadachim veterano!';
+          text = PP.t('encontrou um {u} veterano!', { u: UN.swordsman.name });
         } else r = 'stars';
       }
       if (r === 'pop') {
         let best = null, bd = 1e9;
         for (const c of this.citiesOf(p.id)) { const d = cheb(c, t); if (d < bd) { bd = d; best = c; } }
-        if (best) { text = `encontrou sobreviventes: +3 população em ${best.name}!`; this.addPop(best, 3); }
+        if (best) { text = PP.t('encontrou sobreviventes: +3 população em {c}!', { c: best.name }); this.addPop(best, 3); }
         else r = 'stars';
       }
-      if (r === 'map') { this.reveal(p, t.x, t.y, 5); text = 'encontrou um mapa antigo!'; }
-      if (r === 'science') { p.science += 8; text = 'encontrou pergaminhos: +8⚗!'; }
-      if (r === 'stars') { p.stars += 10; text = 'encontrou um tesouro: +10★!'; }
-      this.log(`${p.name} explorou ruínas e ${text}`, p.id);
+      if (r === 'map') { this.reveal(p, t.x, t.y, 5); text = PP.t('encontrou um mapa antigo!'); }
+      if (r === 'science') { p.science += 8; text = PP.t('encontrou pergaminhos: +8⚗!'); }
+      if (r === 'stars') { p.stars += 10; text = PP.t('encontrou um tesouro: +10★!'); }
+      this.log(PP.t('{p} explorou ruínas e {text}', { p: p.name, text }), p.id);
       this.hook('ruin', p, t, r);
       this.emit('ruin', { player: p.id, tile: t, reward: r, text });
     }
@@ -620,7 +620,7 @@
       let c, old = null;
       if (t.village) {
         c = this.createCity(u.owner, t.x, t.y, false);
-        this.log(`${p.name} fundou ${c.name}.`, p.id);
+        this.log(PP.t('{p} fundou {c}.', { p: p.name, c: c.name }), p.id);
         this.hook('found', c, p);
       } else {
         c = this.cityMap[t.city];
@@ -633,7 +633,7 @@
         for (const x of this.units) if (x.home === c.id && x.owner !== u.owner) x.home = null;
         p.stats.captured++;
         this.invalidate();
-        this.log(`${p.name} conquistou ${c.name} de ${old.name}!`, null);
+        this.log(PP.t('{p} conquistou {c} de {o}!', { p: p.name, c: c.name, o: old.name }), null);
         this.hook('capture', c, old, p);
       }
       u.mp = 0; u.canAttack = false; u.moved = true;
@@ -732,20 +732,20 @@
     trainCheck(p, c, type) {
       const d = UN[type];
       const r = { ok: false, cost: this.unitCostFor(p, c, type), reason: '' };
-      if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
-      if (d.special) { r.reason = 'Não pode ser recrutada'; r.locked = true; return r; }
-      if (d.tech && !this.has(p, d.tech)) { r.reason = 'Requer ' + PP.TECH[d.tech].name; r.locked = true; return r; }
+      if (!c || c.owner !== p.id) { r.reason = PP.t('Cidade inválida'); return r; }
+      if (d.special) { r.reason = PP.t('Não pode ser recrutada'); r.locked = true; return r; }
+      if (d.tech && !this.has(p, d.tech)) { r.reason = PP.t('Requer {x}', { x: PP.TECH[d.tech].name }); r.locked = true; return r; }
       if (d.naval) {
-        if (!this.hasHarbor(c)) { r.reason = 'Requer um porto no território da cidade'; r.locked = true; return r; }
-        if (d.portSpec && c.spec !== 'porto') { r.reason = 'Só em cidades portuárias'; return r; }
-        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = 'Requer ' + PP.STRATEGIC[d.needs].name; return r; }
-        if (!this.harborTile(c)) { r.reason = 'Porto ocupado'; return r; }
+        if (!this.hasHarbor(c)) { r.reason = PP.t('Requer um porto no território da cidade'); r.locked = true; return r; }
+        if (d.portSpec && c.spec !== 'porto') { r.reason = PP.t('Só em cidades portuárias'); return r; }
+        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = PP.t('Requer {x}', { x: PP.STRATEGIC[d.needs].name }); return r; }
+        if (!this.harborTile(c)) { r.reason = PP.t('Porto ocupado'); return r; }
       } else {
-        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = 'Requer ' + PP.STRATEGIC[d.needs].name; return r; }
-        if (this.uGrid[c.y * this.W + c.x]) { r.reason = 'Cidade ocupada'; return r; }
+        if (d.needs && !this.hasStrategic(p, d.needs)) { r.reason = PP.t('Requer {x}', { x: PP.STRATEGIC[d.needs].name }); return r; }
+        if (this.uGrid[c.y * this.W + c.x]) { r.reason = PP.t('Cidade ocupada'); return r; }
       }
-      if (this.cityUnits(c).length >= this.capacity(c)) { r.reason = 'Capacidade máxima'; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (this.cityUnits(c).length >= this.capacity(c)) { r.reason = PP.t('Capacidade máxima'); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     }
@@ -801,9 +801,9 @@
       r.visible = true;
       if (id === 'port' && t.landmark === 'porto_natural') r.cost = 0;
       const occ = this.uGrid[t.y * this.W + t.x];
-      if (a.tech && !this.has(p, a.tech)) { r.reason = 'Requer ' + PP.TECH[a.tech].name; r.locked = true; return r; }
-      if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (a.tech && !this.has(p, a.tech)) { r.reason = PP.t('Requer {x}', { x: PP.TECH[a.tech].name }); r.locked = true; return r; }
+      if (occ && occ.owner !== p.id) { r.reason = PP.t('Casa ocupada pelo inimigo'); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     }
@@ -870,8 +870,8 @@
       if (w.coastal && !this.neighbors(t).some(n => this.isWater(n))) return r;
       r.visible = true;
       const occ = this.uGrid[t.y * this.W + t.x];
-      if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (occ && occ.owner !== p.id) { r.reason = PP.t('Casa ocupada pelo inimigo'); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     }
@@ -900,7 +900,7 @@
         if (opts.length) { p.techs[opts[0].id] = true; this.emit('tech', { player: p.id, tech: opts[0].id }); }
       }
       if (wid === 'eye') p.explored.fill(1);
-      this.log(`${p.name} construiu a maravilha ${w.name}!`, null);
+      this.log(PP.t('{p} construiu a maravilha {w}!', { p: p.name, w: w.name }), null);
       this.hook('wonder', p, wid);
       this.emit('wonder', { player: p.id, tile: t, wonder: wid });
       this.refreshVision(p.id);
@@ -920,12 +920,12 @@
     buildingCheck(p, c, id) {
       const b = PP.BUILDINGS[id];
       const r = { ok: false, cost: this.buildingCost(p, id, c), reason: '' };
-      if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
-      if (b.spec && c.spec !== b.spec) { r.reason = 'Exige cidade ' + PP.SPECS[b.spec].name; r.specLocked = true; if (!c.buildings[id]) return r; }
-      if (c.buildings[id]) { r.reason = b.spec && c.spec !== b.spec ? 'Inativa (outra especialização)' : 'Construído'; r.done = true; return r; }
-      if (b.tech && !this.has(p, b.tech)) { r.reason = 'Requer ' + PP.TECH[b.tech].name; r.locked = true; return r; }
-      if (b.needs && !c.buildings[b.needs]) { r.reason = 'Requer ' + PP.BUILDINGS[b.needs].name; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (!c || c.owner !== p.id) { r.reason = PP.t('Cidade inválida'); return r; }
+      if (b.spec && c.spec !== b.spec) { r.reason = PP.t('Exige cidade {x}', { x: PP.SPECS[b.spec].name }); r.specLocked = true; if (!c.buildings[id]) return r; }
+      if (c.buildings[id]) { r.reason = b.spec && c.spec !== b.spec ? PP.t('Inativa (outra especialização)') : PP.t('Construído'); r.done = true; return r; }
+      if (b.tech && !this.has(p, b.tech)) { r.reason = PP.t('Requer {x}', { x: PP.TECH[b.tech].name }); r.locked = true; return r; }
+      if (b.needs && !c.buildings[b.needs]) { r.reason = PP.t('Requer {x}', { x: PP.BUILDINGS[b.needs].name }); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     }
@@ -1139,7 +1139,7 @@
       p.alive = false;
       for (const u of this.units.slice()) if (u.owner === p.id) { this.units.splice(this.units.indexOf(u), 1); this.uGrid[u.y * this.W + u.x] = null; u.dead = true; }
       p.visible.fill(0);
-      this.log(`${p.name} foi eliminado!`, null);
+      this.log(PP.t('{p} foi eliminado!', { p: p.name }), null);
       this.hook('eliminated', p);
       this.emit('eliminated', { player: p.id });
     }

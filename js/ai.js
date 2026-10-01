@@ -200,7 +200,7 @@
       if (!sciCity) return false;
       const chk = g.projectCheck(p, sciCity);
       if (chk.ok) return true;
-      const ready = !chk.locked && chk.reason === 'Falta ciência';
+      const ready = !chk.locked && chk.reason === PP.t('Falta ciência');
       return ready && (this.strategy === 'ciencia' || g.allTechs(p) || p.project.stage > 0);
     }
 
@@ -745,13 +745,13 @@
         const city = g.cityMap[t.cityId];
         if (t.pillaged) {
           const chk = g.tileActionCheck(p, t, 'repair');
-          if (chk.visible && (chk.ok || chk.reason === 'Faltam estrelas')) out.push({ score: 1.6 / (chk.cost + 1) * eco, cost: chk.cost, exec: () => g.doTileAction(p, t, 'repair') });
+          if (chk.visible && (chk.ok || chk.reason === PP.t('Faltam estrelas'))) out.push({ score: 1.6 / (chk.cost + 1) * eco, cost: chk.cost, exec: () => g.doTileAction(p, t, 'repair') });
           continue;
         }
         for (const a of PP.TILE_ACTIONS) {
           if (a.road || a.fort || a.repair || a.id === 'clear' || a.id === 'plant') continue;
           const chk = g.tileActionCheck(p, t, a.id);
-          if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
+          if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== PP.t('Faltam estrelas'))) continue;
           let v = 0;
           if (a.pop) {
             let pop = a.pop;
@@ -780,7 +780,7 @@
       if (g.routeSlots) {
         for (const c of this.cities) {
           if (g.routesOf(c).length >= g.routeSlots(c)) continue;
-          const best = g.routeCandidates(p, c).find(x => x.yield && (x.check.ok || x.check.reason === 'Faltam estrelas') &&
+          const best = g.routeCandidates(p, c).find(x => x.yield && (x.check.ok || x.check.reason === PP.t('Faltam estrelas')) &&
             (x.city.owner === p.id || g.opinion(p.id, x.city.owner) > -15));
           if (!best) continue;
           const val = best.yield.stars + best.yield.sci * 0.8 + (best.check.kind === 'foreign' ? 0.6 : 0);
@@ -805,7 +805,7 @@
         for (const [t, v] of cand.slice(0, 2)) {
           for (const id of ['fort', 'tower', 'outpost']) {
             const chk = g.tileActionCheck(p, t, id);
-            if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
+            if (!chk.visible || chk.locked || (!chk.ok && chk.reason !== PP.t('Faltam estrelas'))) continue;
             out.push({ score: v / (chk.cost + 1), cost: chk.cost, exec: () => g.doTileAction(p, t, id) });
             break;
           }
@@ -816,7 +816,7 @@
         const th = this.threats[c.id] || 0;
         for (const id of PP.BUILDING_ORDER) {
           const chk = g.buildingCheck(p, c, id);
-          if (chk.done || chk.locked || chk.specLocked || (!chk.ok && chk.reason !== 'Faltam estrelas')) continue;
+          if (chk.done || chk.locked || chk.specLocked || (!chk.ok && chk.reason !== PP.t('Faltam estrelas'))) continue;
           let v = 0;
           const strat = this.strategy;
           switch (id) {
@@ -877,7 +877,7 @@
         const spies = g.unitsOf(p.id).filter(u => UN[u.type].spy).length;
         const want = (this.analysis && this.analysis.wars) || this.strategy === 'ciencia' ? Math.min(2, 1 + Math.floor(this.cities.length / 4)) : 0;
         if (spies < want) {
-          const c = this.cities.find(x => !g.unitAt(x.x, x.y) && g.trainCheck(p, x, 'spy').reason !== 'Capacidade máxima');
+          const c = this.cities.find(x => !g.unitAt(x.x, x.y) && g.trainCheck(p, x, 'spy').reason !== PP.t('Capacidade máxima'));
           if (c) out.push({ score: 0.3, cost: g.unitCostFor(p, c, 'spy'), exec: () => !!g.train(p, c, 'spy') });
         }
       }
@@ -906,7 +906,7 @@
         if (navalOnly && !UN[t].naval) continue;
         if (!W[t] && W[t] !== undefined) continue;
         const chk = g.trainCheck(p, c, t);
-        if (!chk.ok && chk.reason !== 'Faltam estrelas') continue;
+        if (!chk.ok && chk.reason !== PP.t('Faltam estrelas')) continue;
         const d = UN[t];
         const power = d.atk + d.def + d.hp / 5 + d.move * 0.5;
         opts.push([t, (W[t] || 1) * Math.pow(power, 1.6) / Math.pow(d.cost, 0.6)]);

@@ -48,7 +48,7 @@
       for (const a of ev.active.slice()) {
         if (this.turn > a.end) {
           ev.active.splice(ev.active.indexOf(a), 1);
-          this.log(`Fim do evento: ${PP.EVENTS[a.id].name}.`, null);
+          this.log(PP.t('Fim do evento: {e}.', { e: PP.EVENTS[a.id].name }), null);
           this.emit('worldEvent', { id: a.id, phase: 'end' });
         }
       }
@@ -60,7 +60,7 @@
         ev.history.push({ id: a.id, turn: this.turn });
         ev.upcoming = null;
         ev.next = a.end + 1 + this.eventGap();
-        this.log(`Evento mundial: ${def.name}! ${def.desc}`, null);
+        this.log(PP.t('Evento mundial: {e}! {d}', { e: def.name, d: def.desc }), null);
         this.emit('worldEvent', { id: a.id, phase: 'start' });
         if (a.id === 'migration') this.applyMigration();
       }
@@ -78,7 +78,7 @@
           ev.upcoming = { id, start: Math.max(this.turn + 1, ev.next), announced: this.turn };
           ev.last = id;
           const def = PP.EVENTS[id];
-          this.log(`Previsão: ${def.name} começa no turno ${ev.upcoming.start} (${def.dur} turno${def.dur > 1 ? 's' : ''}).`, null);
+          this.log(PP.t('Previsão: {e} começa no turno {n} ({d} turno(s)).', { e: def.name, n: ev.upcoming.start, d: def.dur }), null);
           this.emit('worldEvent', { id, phase: 'announce', start: ev.upcoming.start });
         }
       }
@@ -102,7 +102,7 @@
         if (!far(t)) continue;
         t.village = true; t.road = false; n++;
       }
-      if (n) this.log(`${n} nova${n > 1 ? 's' : ''} aldeia${n > 1 ? 's' : ''} surgiram com a migração.`, null);
+      if (n) this.log(n > 1 ? PP.t('{n} novas aldeias surgiram com a migração.', { n }) : PP.t('Uma nova aldeia surgiu com a migração.'), null);
     },
 
     // ------------------------------------------------------------ Efeitos
@@ -110,7 +110,7 @@
       if (!this.events || !this.events.active.length) return;
       if (this.eventActive('drought') && c.level >= 3) {
         const cut = c.spec === 'agricola' ? 2 : 1;
-        res.stars -= cut; res.notes.push(`Seca −${cut}★`);
+        res.stars -= cut; res.notes.push(PP.t('Seca −{n}★', { n: cut }));
       }
       if (this.eventActive('gold')) {
         let n = 0;
@@ -118,13 +118,13 @@
           if (t.cityId !== c.id || t.owner !== c.owner || t.pillaged) continue;
           if (t.imp === 'mine' || t.imp === 'gemmine') n++;
         }
-        if (n) { res.stars += n; res.notes.push(`Corrida do Ouro +${n}★`); }
+        if (n) { res.stars += n; res.notes.push(PP.t('{e} +{n}★', { e: PP.EVENTS.gold.name, n })); }
       }
       if (this.eventActive('plague') && c.level >= 5 && !c.buildings.temple) {
         const a = Math.round(res.stars * 0.25), b = Math.round(res.sci * 0.25);
-        res.stars -= a; res.sci -= b; res.notes.push('Praga −25%');
+        res.stars -= a; res.sci -= b; res.notes.push(PP.t('{e} −25%', { e: PP.EVENTS.plague.name }));
       }
-      if (this.eventActive('discovery') && c.spec === 'ciencia') { res.sci += 1; res.notes.push('Descoberta +1⚗'); }
+      if (this.eventActive('discovery') && c.spec === 'ciencia') { res.sci += 1; res.notes.push(PP.t('{e} +1⚗', { e: PP.EVENTS.discovery.name })); }
     },
 
     eventIncome(p, res) {
@@ -132,7 +132,7 @@
       if (this.eventActive('gold')) {
         let n = 0;
         for (const t of this.tiles) if (t.owner === p.id && t.landmark === 'mina_abandonada') n += 2;
-        if (n) { res.stars += n; res.lines.push({ label: 'Corrida do Ouro (mina abandonada)', stars: n, sci: 0 }); }
+        if (n) { res.stars += n; res.lines.push({ label: PP.t('{e} ({l})', { e: PP.EVENTS.gold.name, l: PP.LANDMARKS.mina_abandonada.name }), stars: n, sci: 0 }); }
       }
     },
 

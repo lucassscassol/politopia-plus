@@ -145,17 +145,17 @@
     },
 
     opinionLabel(v) {
-      if (v <= -40) return { name: 'Hostil', tag: 'bad' };
-      if (v <= -12) return { name: 'Desconfiada', tag: 'bad' };
-      if (v < 12) return { name: 'Neutra', tag: '' };
-      if (v < 35) return { name: 'Cordial', tag: 'good' };
-      return { name: 'Amigável', tag: 'good' };
+      if (v <= -40) return { name: PP.t('Hostil'), tag: 'bad' };
+      if (v <= -12) return { name: PP.t('Desconfiada'), tag: 'bad' };
+      if (v < 12) return { name: PP.t('Neutra'), tag: '' };
+      if (v < 35) return { name: PP.t('Cordial'), tag: 'good' };
+      return { name: PP.t('Amigável'), tag: 'good' };
     },
 
     // ------------------------------------------------------------ Propostas
     canPropose(from, to, type, data) {
       const a = this.players[from], b = this.players[to];
-      const bad = reason => ({ ok: false, reason });
+      const bad = (reason, v) => ({ ok: false, reason: PP.t(reason, v) });
       if (!a || !b || !a.alive || !b.alive || from === to) return bad('Inválido');
       if (!a.met[to]) return bad('Ainda não se conhecem');
       const st = this.relState(from, to);
@@ -163,7 +163,7 @@
       switch (type) {
         case 'peace':
           if (st !== 'war') return bad('Não estão em guerra');
-          if (locked) return bad(`Guerra total até o turno ${this.opts.diploLockUntil}`);
+          if (locked) return bad('Guerra total até o turno {n}', { n: this.opts.diploLockUntil });
           return { ok: true };
         case 'nap':
           if (st === 'war') return bad('Faça a paz primeiro');
@@ -243,7 +243,7 @@
 
     rejectProposal(acceptor, proposer, type, data) {
       const a = this.players[acceptor], b = this.players[proposer];
-      this.log(`${a.name} recusou ${(PP.PROPOSAL_TYPES[type] || 'a proposta').toLowerCase()} de ${b.name}.`, [acceptor, proposer]);
+      this.log(PP.t('{a} recusou {what} de {b}.', { a: a.name, what: (PP.PROPOSAL_TYPES[type] || PP.t('a proposta')).toLowerCase(), b: b.name }), [acceptor, proposer]);
       if (type === 'alliance' || type === 'call_to_arms' || type === 'joint_war') this.remember(proposer, acceptor, 'refused');
       if (type === 'tribute_demand') {
         this.remember(proposer, acceptor, 'refused');
@@ -278,14 +278,14 @@
     makePeace(a, b) {
       this.setRel(a, b, 'peace');
       this.remember(a, b, 'peace'); this.remember(b, a, 'peace');
-      this.log(`${this.players[a].name} e ${this.players[b].name} assinaram a paz.`, null);
+      this.log(PP.t('{a} e {b} assinaram a paz.', { a: this.players[a].name, b: this.players[b].name }), null);
       this.hook('treaty', a, b, 'peace');
       this.emit('diplomacy', { type: 'peace', a, b });
     },
 
     signNAP(a, b, turns) {
       this.setRel(a, b, 'nap', { until: this.turn + turns });
-      this.log(`${this.players[a].name} e ${this.players[b].name} firmaram um pacto de não agressão por ${turns} turnos.`, null);
+      this.log(PP.t('{a} e {b} firmaram um pacto de não agressão por {n} turnos.', { a: this.players[a].name, b: this.players[b].name, n: turns }), null);
       this.hook('treaty', a, b, 'nap');
       this.emit('diplomacy', { type: 'nap', a, b });
     },
@@ -293,7 +293,7 @@
     formAlliance(a, b) {
       this.setRel(a, b, 'alliance');
       this.remember(a, b, 'alliance'); this.remember(b, a, 'alliance');
-      this.log(`${this.players[a].name} e ${this.players[b].name} formaram uma aliança!`, null);
+      this.log(PP.t('{a} e {b} formaram uma aliança!', { a: this.players[a].name, b: this.players[b].name }), null);
       this.hook('treaty', a, b, 'alliance');
       this.emit('diplomacy', { type: 'alliance', a, b });
       this.refreshVision(a); this.refreshVision(b);
@@ -303,7 +303,7 @@
       if (!this.allied(a, b)) return false;
       this.setRel(a, b, 'peace');
       this.remember(b, a, 'left_alliance');
-      this.log(`${this.players[a].name} encerrou a aliança com ${this.players[b].name}.`, null);
+      this.log(PP.t('{a} encerrou a aliança com {b}.', { a: this.players[a].name, b: this.players[b].name }), null);
       this.emit('diplomacy', { type: 'left', a, b });
       this.refreshVision(a); this.refreshVision(b);
       return true;
@@ -323,8 +323,8 @@
       if (kind !== 'declared_war') {
         for (const q of this.players) if (q.alive && q.id !== a && q.id !== b && q.met[a]) this.remember(q.id, a, 'traitor_seen');
       }
-      const verb = kind === 'betrayed_ally' ? 'traiu a aliança e declarou guerra a' : kind === 'broke_treaty' ? 'rompeu o pacto e declarou guerra a' : 'declarou guerra a';
-      this.log(`${A.name} ${verb} ${B.name}!`, null);
+      const msg = kind === 'betrayed_ally' ? '{a} traiu a aliança e declarou guerra a {b}!' : kind === 'broke_treaty' ? '{a} rompeu o pacto e declarou guerra a {b}!' : '{a} declarou guerra a {b}!';
+      this.log(PP.t(msg, { a: A.name, b: B.name }), null);
       this.hook('war', a, b, kind);
       this.emit('diplomacy', { type: 'war', a, b, kind });
       // aliados da vítima recebem um chamado às armas
@@ -347,19 +347,19 @@
     // ------------------------------------------------------------ Comércio entre tribos
     // deal = { give: {stars, sci, iron, horses}, get: {...} } do ponto de vista do proponente
     tradeValid(from, to, deal) {
-      if (!deal || !deal.give || !deal.get) return { ok: false, reason: 'Acordo vazio' };
+      if (!deal || !deal.give || !deal.get) return { ok: false, reason: PP.t('Acordo vazio') };
       const a = this.players[from], b = this.players[to];
       const side = (p, items) => {
-        if ((items.stars || 0) > p.stars) return 'estrelas insuficientes';
-        if ((items.sci || 0) > p.science) return 'ciência insuficiente';
-        for (const r of ['iron', 'horses']) if (items[r] && !this.ownsStrategic(p, r)) return `não possui ${PP.STRATEGIC[r].name} próprio`;
+        if ((items.stars || 0) > p.stars) return PP.t('estrelas insuficientes');
+        if ((items.sci || 0) > p.science) return PP.t('ciência insuficiente');
+        for (const r of ['iron', 'horses']) if (items[r] && !this.ownsStrategic(p, r)) return PP.t('não possui {x} próprio', { x: PP.STRATEGIC[r].name });
         return null;
       };
       const e1 = side(a, deal.give), e2 = side(b, deal.get);
-      if (e1) return { ok: false, reason: 'Você: ' + e1 };
-      if (e2) return { ok: false, reason: 'Eles: ' + e2 };
+      if (e1) return { ok: false, reason: PP.t('Você: {x}', { x: e1 }) };
+      if (e2) return { ok: false, reason: PP.t('Eles: {x}', { x: e2 }) };
       const empty = o => !(o.stars > 0 || o.sci > 0 || o.iron || o.horses);
-      if (empty(deal.give) && empty(deal.get)) return { ok: false, reason: 'Acordo vazio' };
+      if (empty(deal.give) && empty(deal.get)) return { ok: false, reason: PP.t('Acordo vazio') };
       return { ok: true };
     },
 
@@ -379,7 +379,7 @@
       move(b, a, deal.get);
       this.remember(from, to, 'trade'); this.remember(to, from, 'trade');
       this.invalidate();
-      this.log(`${a.name} e ${b.name} fecharam um acordo comercial.`, [from, to]);
+      this.log(PP.t('{a} e {b} fecharam um acordo comercial.', { a: a.name, b: b.name }), [from, to]);
       this.hook('tradeDeal', from, to, deal);
       this.emit('diplomacy', { type: 'trade', a: from, b: to });
     },
@@ -394,7 +394,7 @@
       if (demanded) this.remember(from, to, 'extortion');
       b.tribute = b.tribute || {};
       b.tribute[from] = this.turn;
-      this.log(`${a.name} pagou ${amount}★ de tributo a ${b.name}.`, [from, to]);
+      this.log(PP.t('{a} pagou {n}★ de tributo a {b}.', { a: a.name, n: amount, b: b.name }), [from, to]);
       this.hook('tribute', from, to, amount);
       this.emit('diplomacy', { type: 'tribute', a: from, b: to, amount });
       return true;
@@ -435,7 +435,7 @@
             g.remember(p.id, q.id, 'treaty_kept'); g.remember(q.id, p.id, 'treaty_kept');
             p.reputation = Math.min(3, (p.reputation || 0) + 1);
             q.reputation = Math.min(3, (q.reputation || 0) + 1);
-            g.log(`O pacto de não agressão entre ${p.name} e ${q.name} terminou e foi cumprido.`, null);
+            g.log(PP.t('O pacto de não agressão entre {a} e {b} terminou e foi cumprido.', { a: p.name, b: q.name }), null);
             g.emit('diplomacy', { type: 'nap_end', a: p.id, b: q.id });
           } else if (r.state === 'alliance' && (g.turn - r.since) > 0 && (g.turn - r.since) % 10 === 0) {
             g.remember(p.id, q.id, 'treaty_kept', 5); g.remember(q.id, p.id, 'treaty_kept', 5);

@@ -112,7 +112,7 @@
         this.hook('unitKilled', u, killer);
         this.emit('death', { unit: u, killer, cargo: true });
       }
-      if (lost.length) this.log(`${lost.length} tropa(s) afundaram com o transporte de ${this.players[tr.owner].name}.`, [tr.owner].concat(killer ? [killer.owner] : []));
+      if (lost.length) this.log(PP.t('{n} tropa(s) afundaram com o transporte de {p}.', { n: lost.length, p: this.players[tr.owner].name }), [tr.owner].concat(killer ? [killer.owner] : []));
     },
   };
 

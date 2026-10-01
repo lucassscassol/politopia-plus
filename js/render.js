@@ -310,13 +310,13 @@
           this.pops.push({ kind: 'spawn', unit: d.unit, t0: now, dur: this.dur(320) || 1 });
           break;
         case 'capture':
-          if (this.visibleTo(d.city.x, d.city.y)) { this.ring(d.city.x, d.city.y, GOLD, now); this.float(d.city.x, d.city.y, d.from >= 0 ? 'Conquistada' : 'Cidade fundada', '#e6c886', now, 1.1); }
+          if (this.visibleTo(d.city.x, d.city.y)) { this.ring(d.city.x, d.city.y, GOLD, now); this.float(d.city.x, d.city.y, d.from >= 0 ? PP.t('Conquistada') : PP.t('Cidade fundada'), '#e6c886', now, 1.1); }
           break;
         case 'levelup':
-          if (this.visibleTo(d.city.x, d.city.y)) this.float(d.city.x, d.city.y, 'Nível ' + roman(d.city.level), '#e6c886', now + 150, 1.1);
+          if (this.visibleTo(d.city.x, d.city.y)) this.float(d.city.x, d.city.y, PP.t('Nível {n}', { n: roman(d.city.level) }), '#e6c886', now + 150, 1.1);
           break;
         case 'pop':
-          if (d.city.owner === this.viewer) this.float(d.city.x, d.city.y, '+' + d.amount + ' pop.', '#b9d69a', now, 0.9);
+          if (d.city.owner === this.viewer) this.float(d.city.x, d.city.y, PP.t('+{n} pop.', { n: d.amount }), '#b9d69a', now, 0.9);
           break;
         case 'build':
           if (this.visibleTo(d.tile.x, d.tile.y)) this.ring(d.tile.x, d.tile.y, '#b9d69a', now);
@@ -328,7 +328,7 @@
           for (const h of d.units) if (h.amount > 0 && this.visibleTo(h.unit.x, h.unit.y)) this.float(h.unit.x, h.unit.y, '+' + h.amount, MOSS, now);
           break;
         case 'convert':
-          if (this.visibleTo(d.target.x, d.target.y)) { this.float(d.target.x, d.target.y, 'Convertido', '#c9a6e0', now); this.ring(d.target.x, d.target.y, '#9f7fc0', now); }
+          if (this.visibleTo(d.target.x, d.target.y)) { this.float(d.target.x, d.target.y, PP.t('Convertido'), '#c9a6e0', now); this.ring(d.target.x, d.target.y, '#9f7fc0', now); }
           break;
         case 'promote':
           if (this.visibleTo(d.unit.x, d.unit.y)) this.float(d.unit.x, d.unit.y, PP.PROMOTIONS[d.promo].name, '#e6c886', now);
@@ -337,7 +337,7 @@
           if (this.visibleTo(d.tile.x, d.tile.y)) this.ring(d.tile.x, d.tile.y, GOLD, now);
           break;
         case 'pillage':
-          if (this.visibleTo(d.tile.x, d.tile.y)) { this.ring(d.tile.x, d.tile.y, '#d0703f', now); this.float(d.tile.x, d.tile.y, 'Saque +' + d.loot + '★', '#e6a36a', now); }
+          if (this.visibleTo(d.tile.x, d.tile.y)) { this.ring(d.tile.x, d.tile.y, '#d0703f', now); this.float(d.tile.x, d.tile.y, PP.t('Saque +{n}★', { n: d.loot }), '#e6a36a', now); }
           break;
         case 'ability':
           if (this.visibleTo(d.unit.x, d.unit.y) && (d.unit.owner === this.viewer || !(this.game.isStealthed && this.game.isStealthed(d.unit)))) {
@@ -347,13 +347,13 @@
           }
           break;
         case 'attrition':
-          if (d.unit.owner === this.viewer) this.float(d.unit.x, d.unit.y, '−1 frio', '#b7c3c6', now, 0.85);
+          if (d.unit.owner === this.viewer) this.float(d.unit.x, d.unit.y, PP.t('−1 frio'), '#b7c3c6', now, 0.85);
           break;
         case 'fortTaken':
           if (this.visibleTo(d.tile.x, d.tile.y)) this.ring(d.tile.x, d.tile.y, GOLD, now);
           break;
         case 'spy':
-          if (d.unit.owner === this.viewer && !d.caught) this.float(d.unit.x, d.unit.y, 'Missão cumprida', '#c9a6e0', now, 0.9);
+          if (d.unit.owner === this.viewer && !d.caught) this.float(d.unit.x, d.unit.y, PP.t('Missão cumprida'), '#c9a6e0', now, 0.9);
           break;
       }
     }
@@ -690,7 +690,7 @@
         ctx.globalAlpha = 0.8;
         ctx.font = `700 10px ${FONT_B}`; ctx.textAlign = 'center';
         ctx.fillStyle = BONE; ctx.strokeStyle = 'rgba(10,8,6,0.85)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
-        const txt = s.age <= 0 ? 'agora' : `há ${s.age}t`;
+        const txt = s.age <= 0 ? PP.t('agora') : PP.t('há {n}t', { n: s.age });
         ctx.strokeText(txt, pos.x, pos.y + 4); ctx.fillText(txt, pos.x, pos.y + 4);
         ctx.restore();
       }

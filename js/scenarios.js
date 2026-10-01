@@ -98,9 +98,9 @@
 
   PP.scenarioCheck = function (id, players) {
     const s = PP.SCENARIOS[id];
-    if (!s) return { ok: false, reason: 'Cenário desconhecido' };
-    if (s.minPlayers && players.length < s.minPlayers) return { ok: false, reason: `Requer ${s.minPlayers} tribos` };
-    if (s.needsHuman && players.filter(p => p.human).length !== 1) return { ok: false, reason: 'Requer exatamente 1 jogador humano' };
+    if (!s) return { ok: false, reason: PP.t('Cenário desconhecido') };
+    if (s.minPlayers && players.length < s.minPlayers) return { ok: false, reason: PP.t('Requer {n} tribos', { n: s.minPlayers }) };
+    if (s.needsHuman && players.filter(p => p.human).length !== 1) return { ok: false, reason: PP.t('Requer exatamente 1 jogador humano') };
     return { ok: true };
   };
 

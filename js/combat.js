@@ -40,7 +40,7 @@
     // ------------------------------------------------------------ Modificadores do atacante
     combatMods(a, d, sa, sd) {
       const r = { atk: 1, def: 1, dmg: 1, noRet: false, notes: [] };
-      const add = (v, label) => { r.atk *= 1 + v; r.notes.push(label + ' ' + pct(v)); };
+      const add = (v, label) => { r.atk *= 1 + v; r.notes.push(PP.t(label) + ' ' + pct(v)); };
       const ta = this.tiles[a.y * this.W + a.x], td = this.tiles[d.y * this.W + d.x];
       const dist = cheb(a, d);
       const pa = this.players[a.owner];
@@ -64,7 +64,7 @@
       if (b.charge) add(0.4, 'Carga');
       if (b.bless) add(0.2, 'Bênção');
       if (b.amphib) add(-0.25, 'Desembarque');
-      if (b.aim) { r.dmg *= 1.5; r.notes.push('Tiro preciso +50% dano'); }
+      if (b.aim) { r.dmg *= 1.5; r.notes.push(PP.t('Tiro preciso +50% dano')); }
       if (pa.tribe === 'zambe') {
         const vet = this.neighbors(a).some(nb => {
           const o = this.uGrid[nb.y * this.W + nb.x];
@@ -108,11 +108,11 @@
     defenseNotes(d) {
       const t = this.tiles[d.y * this.W + d.x], st = this.stat(d), out = [];
       if (t.fort && !st.naval && this.allyOf(d.owner, t.fort.owner)) out.push(PP.FORTS[t.fort.type].name);
-      if (!st.naval && t.landmark === 'passo') out.push('Passo de montanha');
-      if (!t.city && this.friendsAround(d.x, d.y, d.owner, d) > 0) out.push('Formação');
-      if (d.buff && d.buff.taunt) out.push('Provocação');
-      if (d.buff && d.buff.bless) out.push('Bênção');
-      if (this.supplyLevel && this.supplyLevel(d) > 0) out.push('Sem suprimentos');
+      if (!st.naval && t.landmark === 'passo') out.push(PP.LANDMARKS.passo.name);
+      if (!t.city && this.friendsAround(d.x, d.y, d.owner, d) > 0) out.push(PP.t('Formação'));
+      if (d.buff && d.buff.taunt) out.push(PP.t('Provocação'));
+      if (d.buff && d.buff.bless) out.push(PP.t('Bênção'));
+      if (this.supplyLevel && this.supplyLevel(d) > 0) out.push(PP.t('Sem suprimentos'));
       return out;
     },
 
@@ -174,7 +174,7 @@
         const dmg = Math.max(1, Math.round(r.dmg * 0.35));
         e.opp = this.turn;
         u.hp -= dmg;
-        const ev = { attacker: e, defender: u, dmg, ret: 0, killed: false, attackerKilled: false, splash: [], from: { x: e.x, y: e.y }, to: { x: u.x, y: u.y }, notes: ['Ataque de oportunidade'], opportunity: true };
+        const ev = { attacker: e, defender: u, dmg, ret: 0, killed: false, attackerKilled: false, splash: [], from: { x: e.x, y: e.y }, to: { x: u.x, y: u.y }, notes: [PP.t('Ataque de oportunidade')], opportunity: true };
         if (u.hp <= 0) { ev.killed = true; this.killUnit(u, e); this.gainXp(e, 1); }
         this.emit('attack', ev);
       }
@@ -190,30 +190,30 @@
     abilityCheck(u, id) {
       const a = PP.ABILITIES[id];
       const r = { ok: false, reason: '', ready: 0 };
-      if (!a || a.units.indexOf(u.type) < 0) { r.reason = 'Indisponível'; return r; }
-      if (u.owner !== this.current || this.over) { r.reason = 'Fora do turno'; return r; }
+      if (!a || a.units.indexOf(u.type) < 0) { r.reason = PP.t('Indisponível'); return r; }
+      if (u.owner !== this.current || this.over) { r.reason = PP.t('Fora do turno'); return r; }
       const ready = (u.cd && u.cd[id]) || 0;
-      if (ready > this.turn) { r.reason = `Recarga: ${ready - this.turn} turno(s)`; r.ready = ready - this.turn; return r; }
-      if (a.before && (u.moved || u.attacked)) { r.reason = 'Use antes de mover ou atacar'; return r; }
+      if (ready > this.turn) { r.reason = PP.t('Recarga: {n} turno(s)', { n: ready - this.turn }); r.ready = ready - this.turn; return r; }
+      if (a.before && (u.moved || u.attacked)) { r.reason = PP.t('Use antes de mover ou atacar'); return r; }
       switch (id) {
         case 'aim': case 'bombard':
-          if (!u.canAttack) { r.reason = 'Sem ataque neste turno'; return r; }
+          if (!u.canAttack) { r.reason = PP.t('Sem ataque neste turno'); return r; }
           break;
         case 'charge':
-          if (!u.canAttack) { r.reason = 'Sem ataque neste turno'; return r; }
-          if (this.stat(u).naval) { r.reason = 'Não funciona embarcado'; return r; }
+          if (!u.canAttack) { r.reason = PP.t('Sem ataque neste turno'); return r; }
+          if (this.stat(u).naval) { r.reason = PP.t('Não funciona embarcado'); return r; }
           break;
         case 'taunt': case 'phalanx':
-          if (u.attacked) { r.reason = 'Já atacou'; return r; }
-          if (this.stat(u).naval) { r.reason = 'Não funciona embarcado'; return r; }
+          if (u.attacked) { r.reason = PP.t('Já atacou'); return r; }
+          if (this.stat(u).naval) { r.reason = PP.t('Não funciona embarcado'); return r; }
           break;
         case 'bless':
-          if (!u.canAttack) { r.reason = 'Já agiu'; return r; }
-          if (!this.neighbors(u).some(n => { const o = this.uGrid[n.y * this.W + n.x]; return o && o.owner === u.owner; })) { r.reason = 'Nenhum aliado vizinho'; return r; }
+          if (!u.canAttack) { r.reason = PP.t('Já agiu'); return r; }
+          if (!this.neighbors(u).some(n => { const o = this.uGrid[n.y * this.W + n.x]; return o && o.owner === u.owner; })) { r.reason = PP.t('Nenhum aliado vizinho'); return r; }
           break;
         case 'broadside':
-          if (!u.canAttack) { r.reason = 'Já atacou'; return r; }
-          if (!this.broadsideTargets(u).length) { r.reason = 'Nenhum inimigo vizinho'; return r; }
+          if (!u.canAttack) { r.reason = PP.t('Já atacou'); return r; }
+          if (!this.broadsideTargets(u).length) { r.reason = PP.t('Nenhum inimigo vizinho'); return r; }
           break;
       }
       r.ok = true;
@@ -272,7 +272,7 @@
       }
       const ps = this.players[u.owner].stats;
       ps.abilities = (ps.abilities || 0) + 1;
-      this.log(`${this.players[u.owner].name}: ${this.stat(u).name} usou ${def.name}.`, u.owner);
+      this.log(PP.t('{p}: {u} usou {a}.', { p: this.players[u.owner].name, u: this.stat(u).name, a: def.name }), u.owner);
       this.emit('ability', ev);
       this.refreshVision(u.owner);
       return true;

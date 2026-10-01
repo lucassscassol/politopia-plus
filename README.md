@@ -90,6 +90,9 @@ Bônus de defesa: cidade ×1,5, muralhas ×3, floresta ×1,5 (com Arco e Flecha)
 index.html            página do jogo
 css/style.css         interface (HUD, painéis, modais)
 js/util.js            RNG com semente e ruído para mapas
+js/i18n.js            idiomas: PP.t (textos), PP.num (decimais) e PP.applyLanguage (camada sobre os dados)
+js/lang/en.js         inglês: dicionário da interface e textos das regras
+js/lang/es.js         espanhol: dicionário da interface e textos das regras
 js/data.js            regras em dados: terrenos, recursos, tecnologias, unidades, construções, especializações, tribos...
 js/icons.js           ícones vetoriais (gerado por tools/build-icons.py a partir de tools/icons.json)
 js/mapgen.js          geração procedural em 9 etapas + validateMap e regeração
@@ -118,6 +121,9 @@ tests/load.js         carrega o motor no Node na mesma ordem do index.html
 tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, saves antigos...)
 tests/sim.js          partidas IA × IA com checagens de integridade e salvar/carregar
 tests/balance.js      simulações de balanceamento com todas as vitórias e cenários
+tests/i18n.js         cobertura dos idiomas e partida idêntica em qualquer idioma
+tests/i18n-keys.js    coleta as chaves de texto do código e do index.html
+tests/i18n-data.js    lista os textos das regras que cada idioma traduz
 tests/fixtures/       saves da versão 1 usados no teste de compatibilidade
 ```
 
@@ -125,10 +131,16 @@ tests/fixtures/       saves da versão 1 usados no teste de compatibilidade
 
 O núcleo (`game.js`) cuida de mapa, unidades, cidades, turnos e salvamento. Cada sistema novo é um módulo que adiciona métodos ao `PP.Game.prototype` e se registra com `PP.registerSystem(nome, ganchos)`. O núcleo chama os ganchos (`init`, `load`, `save`, `beforeTurn`, `income`, `newRound`, `capture`, `unitKilled`, `war`, `treaty`...) e os pontos de extensão opcionais (`statMods`, `combatMods`, `defenseMods`, `capacityBonus`, `unitCost`...). O save (versão 2) guarda o estado de cada sistema num bloco `sys`; saves da versão 1 recebem valores padrão ao carregar.
 
+### Idiomas
+
+O jogo vem em português (padrão), inglês e espanhol; o idioma é escolhido no menu principal ou no Menu da partida e fica salvo no aparelho. O português é o texto-fonte: todo texto visível passa por `PP.t('texto em português', { variáveis })`, que devolve a tradução do idioma ativo (variáveis entram como `{nome}`). Os textos das regras (unidades, tecnologias, construções, eventos, conquistas...) são traduzidos por caminho a partir de `PP` (ex.: `'UNITS.warrior.name'`) em `PP.I18N_DATA`, e `PP.applyLanguage` troca esses textos guardando os originais. Para adicionar um idioma, crie `js/lang/xx.js` com `PP.I18N.xx` e `PP.I18N_DATA.xx`, inclua-o em `PP.LANGS`, no `index.html` e em `tests/load.js`; `node tests/i18n.js` aponta tudo o que faltar. Ao escrever um texto novo no código, use `PP.t` e acrescente a tradução nos dois arquivos — o teste falha se faltar.
+
+O idioma não altera a jogabilidade (o teste joga a mesma partida nos três idiomas e compara o resultado). Entradas da Crônica já registradas continuam no idioma em que foram escritas; nomes de tribos e cidades são nomes próprios e não mudam.
+
 ## Testes
 
 ```
-npm test                    # testes dos sistemas + 8 partidas IA × IA de até 70 turnos
+npm test                    # testes dos sistemas + idiomas + 8 partidas IA × IA de até 70 turnos
 npm run balance             # 12 partidas com todas as vitórias e cenários, com estatísticas
 node tests/systems.js       # só os testes de sistemas (ONLY=texto filtra pelo nome)
 node tests/sim.js 20 80

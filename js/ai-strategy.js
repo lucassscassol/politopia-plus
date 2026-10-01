@@ -98,7 +98,7 @@
       ai.prevStrategy = ai.strategy || null;
       ai.strategy = next;
       ai.since = g.turn;
-      g.log(`${p.name} mudou de objetivo: ${PP.AI_STRATEGIES[next].name}.`, p.id);
+      g.log(PP.t('{p} mudou de objetivo: {o}.', { p: p.name, o: PP.AI_STRATEGIES[next].name }), p.id);
     }
     ai.lastLost = p.stats.citiesLost || 0;
     S.chooseTarget(g, p, a);

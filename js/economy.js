@@ -40,7 +40,7 @@
         if (conn && !c.connected) {
           c.connected = true;
           this.addPop(c, 1); this.addPop(cap, 1);
-          this.log(`${c.name} foi conectada à capital!`, p.id);
+          this.log(PP.t('{c} foi conectada à capital!', { c: c.name }), p.id);
           this.emit('connected', { city: c });
         }
         c.connected = conn;
@@ -95,13 +95,13 @@
       if (m.m_university) sci += 4;
       if (m.m_market) stars += 2;
       if (m.m_bourse) stars += 3;
-      if (c.metropolis) { stars += 2; sci += 2; notes.push('Metrópole +2★ +2⚗'); }
+      if (c.metropolis) { stars += 2; sci += 2; notes.push(PP.t('Metrópole +2★ +2⚗')); }
       // --- especialização
       switch (c.spec) {
         case 'comercio': {
           const add = Math.round(stars * 0.3);
           stars += add; sci -= 1;
-          notes.push(`Comercial +${add}★ −1⚗`);
+          notes.push(PP.t('Comercial +{n}★ −1⚗', { n: add }));
           break;
         }
         case 'ciencia': {
@@ -109,21 +109,21 @@
           const add = Math.max(2, Math.round(sci * 0.25));
           const cut = Math.round(stars * 0.3);
           sci += add; stars -= cut;
-          notes.push(`Científica +${add}⚗ −${cut}★`);
+          notes.push(PP.t('Científica +{n}⚗ −{m}★', { n: add, m: cut }));
           break;
         }
         case 'militar': {
           const cut = Math.ceil(sci / 2);
           sci -= cut;
-          notes.push(`Militar −${cut}⚗`);
+          notes.push(PP.t('Militar −{n}⚗', { n: cut }));
           break;
         }
-        case 'agricola': stars -= 1; sci -= 1; notes.push('Agrícola −1★ −1⚗'); break;
+        case 'agricola': stars -= 1; sci -= 1; notes.push(PP.t('Agrícola −1★ −1⚗')); break;
         case 'porto': {
           const sea = this.seaTiles(c);
           const add = Math.min(3, sea);
-          if (add) { stars += add; notes.push(`Portuária +${add}★`); }
-          if (this.specActive(c, 'customs')) { const a2 = Math.min(4, sea); stars += a2; if (a2) notes.push(`Alfândega +${a2}★`); }
+          if (add) { stars += add; notes.push(PP.t('Portuária +{n}★', { n: add })); }
+          if (this.specActive(c, 'customs')) { const a2 = Math.min(4, sea); stars += a2; if (a2) notes.push(PP.t('{b} +{n}★', { b: PP.BUILDINGS.customs.name, n: a2 })); }
           break;
         }
       }
@@ -135,7 +135,7 @@
       if (mult < 1) {
         res.stars = Math.floor(res.stars * mult);
         res.sci = Math.floor(res.sci * mult);
-        notes.push(`Produção ×${String(mult).replace('.', ',')}`);
+        notes.push(PP.t('Produção ×{m}', { m: PP.num(mult) }));
       }
       res.stars = Math.max(0, res.stars);
       res.sci = Math.max(0, res.sci);
@@ -163,29 +163,29 @@
         const ci = this.cityIncome(c, byCity[c.id] || 0);
         stars += ci.stars; sci += ci.sci;
       }
-      lines.push({ label: 'Cidades', stars, sci });
+      lines.push({ label: PP.t('Cidades'), stars, sci });
       let ws = 0, wc = 0;
       if (this.wonders.pyramids === p.id) ws += 3;
       if (this.wonders.colossus === p.id) ws += Math.min(10, ports);
       if (this.wonders.great_library === p.id) wc += 4;
       if (this.wonders.oracle === p.id) wc += 2;
-      if (ws || wc) lines.push({ label: 'Maravilhas', stars: ws, sci: wc });
+      if (ws || wc) lines.push({ label: PP.t('Maravilhas'), stars: ws, sci: wc });
       stars += ws; sci += wc;
-      if (lmStars || lmSci) lines.push({ label: 'Pontos estratégicos e santuários', stars: lmStars, sci: lmSci });
+      if (lmStars || lmSci) lines.push({ label: PP.t('Pontos estratégicos e santuários'), stars: lmStars, sci: lmSci });
       stars += lmStars; sci += lmSci;
       const tr = this.routeIncome(p);
-      if (tr.stars || tr.sci) lines.push({ label: 'Rotas comerciais', stars: tr.stars, sci: tr.sci });
+      if (tr.stars || tr.sci) lines.push({ label: PP.t('Rotas comerciais'), stars: tr.stars, sci: tr.sci });
       stars += tr.stars; sci += tr.sci;
       // bônus percentuais do império (marcos de nível 10)
       const mine = this.citiesOf(p.id);
-      if (mine.some(c => c.milestones && c.milestones.m_freeport)) { const a = Math.round(stars * 0.1); stars += a; if (a) lines.push({ label: 'Capital Mercantil', stars: a, sci: 0 }); }
-      if (mine.some(c => c.milestones && c.milestones.m_invisible)) { const a = Math.round(sci * 0.1); sci += a; if (a) lines.push({ label: 'Colégio Invisível', stars: 0, sci: a }); }
+      if (mine.some(c => c.milestones && c.milestones.m_freeport)) { const a = Math.round(stars * 0.1); stars += a; if (a) lines.push({ label: PP.REWARDS.m_freeport.name, stars: a, sci: 0 }); }
+      if (mine.some(c => c.milestones && c.milestones.m_invisible)) { const a = Math.round(sci * 0.1); sci += a; if (a) lines.push({ label: PP.REWARDS.m_invisible.name, stars: 0, sci: a }); }
       const res = { stars, sci, trade: tr.stars, lines };
       if (this.eventIncome) this.eventIncome(p, res);
       if (!p.human) {
         const d = PP.DIFFICULTY[this.opts.difficulty] || PP.DIFFICULTY.normal;
         res.stars += d.stars; res.sci += d.sci;
-        if (d.stars || d.sci) res.lines.push({ label: 'Dificuldade', stars: d.stars, sci: d.sci });
+        if (d.stars || d.sci) res.lines.push({ label: PP.t('Dificuldade'), stars: d.stars, sci: d.sci });
       }
       res.stars = Math.max(0, Math.round(res.stars));
       res.sci = Math.max(0, Math.round(res.sci));
@@ -323,28 +323,28 @@
     routeCheck(p, from, to, search) {
       const r = { ok: false, reason: '', cost: 0 };
       this.ensureRoutes();
-      if (!from || !to || from.owner !== p.id || from === to) { r.reason = 'Inválido'; return r; }
+      if (!from || !to || from.owner !== p.id || from === to) { r.reason = PP.t('Inválido'); return r; }
       const kind = this.routeKindFor(p.id, to);
       r.kind = kind;
       r.cost = PP.ROUTES.cost[kind];
       if (kind === 'foreign') {
         const q = this.players[to.owner];
-        if (!p.met[q.id]) { r.reason = 'Tribo desconhecida'; return r; }
-        if (this.atWar(p.id, q.id)) { r.reason = 'Em guerra'; return r; }
-        if (!this.has(p, 'comercio')) { r.reason = 'Requer Comércio'; r.locked = true; return r; }
+        if (!p.met[q.id]) { r.reason = PP.t('Tribo desconhecida'); return r; }
+        if (this.atWar(p.id, q.id)) { r.reason = PP.t('Em guerra'); return r; }
+        if (!this.has(p, 'comercio')) { r.reason = PP.t('Requer {x}', { x: PP.TECH.comercio.name }); r.locked = true; return r; }
       }
-      if (!p.explored[to.y * this.W + to.x]) { r.reason = 'Cidade não explorada'; return r; }
-      if (cheb(from, to) < PP.ROUTES.minDist) { r.reason = 'Muito perto'; return r; }
-      if (this.routes.some(x => (x.a === from.id && x.b === to.id) || (x.a === to.id && x.b === from.id))) { r.reason = 'Rota já existe'; return r; }
-      if (this.routesOf(from).length >= this.routeSlots(from)) { r.reason = 'Sem vagas de rota nesta cidade'; return r; }
-      if (kind === 'domestic' && this.routesOf(to).length >= this.routeSlots(to)) { r.reason = `Sem vagas em ${to.name}`; return r; }
+      if (!p.explored[to.y * this.W + to.x]) { r.reason = PP.t('Cidade não explorada'); return r; }
+      if (cheb(from, to) < PP.ROUTES.minDist) { r.reason = PP.t('Muito perto'); return r; }
+      if (this.routes.some(x => (x.a === from.id && x.b === to.id) || (x.a === to.id && x.b === from.id))) { r.reason = PP.t('Rota já existe'); return r; }
+      if (this.routesOf(from).length >= this.routeSlots(from)) { r.reason = PP.t('Sem vagas de rota nesta cidade'); return r; }
+      if (kind === 'domestic' && this.routesOf(to).length >= this.routeSlots(to)) { r.reason = PP.t('Sem vagas em {c}', { c: to.name }); return r; }
       search = search || this.tradeSearch(p.id, from, PP.ROUTES.maxLen);
       const d = search.dist[to.y * this.W + to.x];
-      if (d < 0) { r.reason = 'Sem caminho por estrada ou mar'; return r; }
+      if (d < 0) { r.reason = PP.t('Sem caminho por estrada ou mar'); return r; }
       r.len = d;
       r.path = this.tracePath(search, to);
       r.sea = r.path.some(i => this.isWater(this.tiles[i]));
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     },
@@ -357,7 +357,7 @@
         if (c === from) continue;
         if (c.owner !== p.id && !p.met[c.owner]) continue;
         const chk = this.routeCheck(p, from, c, search);
-        if (chk.ok || chk.len != null || chk.reason === 'Faltam estrelas') {
+        if (chk.ok || chk.len != null || chk.reason === PP.t('Faltam estrelas')) {
           const preview = chk.len != null ? this.routeYield({ a: from.id, b: c.id, owner: p.id, kind: chk.kind, len: chk.len, sea: chk.sea, active: true }) : null;
           out.push({ city: c, check: chk, yield: preview });
         }
@@ -375,8 +375,8 @@
       this.routes.push(r);
       if (r.kind === 'foreign') {
         this.remember(to.owner, p.id, 'trade'); this.remember(p.id, to.owner, 'trade');
-        this.log(`${p.name} abriu uma rota comercial entre ${from.name} e ${to.name} (${this.players[to.owner].name}).`, [p.id, to.owner]);
-      } else this.log(`Rota comercial aberta entre ${from.name} e ${to.name}.`, p.id);
+        this.log(PP.t('{p} abriu uma rota comercial entre {a} e {b} ({q}).', { p: p.name, a: from.name, b: to.name, q: this.players[to.owner].name }), [p.id, to.owner]);
+      } else this.log(PP.t('Rota comercial aberta entre {a} e {b}.', { a: from.name, b: to.name }), p.id);
       this.hook('route', r);
       this.emit('route', { route: r, player: p.id });
       return r;
@@ -388,7 +388,7 @@
       if (i < 0) return false;
       this.routes.splice(i, 1);
       const A = this.cityMap[r.a], B = this.cityMap[r.b];
-      if (reason && A && B) this.log(`A rota entre ${A.name} e ${B.name} foi encerrada: ${reason}.`, [r.owner, r.partner]);
+      if (reason && A && B) this.log(PP.t('A rota entre {a} e {b} foi encerrada: {r}.', { a: A.name, b: B.name, r: reason }), [r.owner, r.partner]);
       this.emit('route', { route: r, cancelled: true, reason });
       return true;
     },
@@ -400,17 +400,17 @@
       for (const r of this.routes.slice()) {
         if (r.owner !== p.id) continue;
         const A = this.cityMap[r.a], B = this.cityMap[r.b];
-        if (!A || !B || A.owner !== p.id) { this.cancelRoute(r, 'a cidade de origem mudou de dono'); continue; }
-        if (r.kind === 'domestic' && B.owner !== p.id) { this.cancelRoute(r, `${B.name} mudou de dono`); continue; }
-        if (r.kind === 'foreign' && (B.owner === p.id || B.owner !== r.partner)) { this.cancelRoute(r, `${B.name} mudou de dono`); continue; }
-        if (r.kind === 'foreign' && this.atWar(p.id, B.owner)) { this.cancelRoute(r, 'guerra'); continue; }
+        if (!A || !B || A.owner !== p.id) { this.cancelRoute(r, PP.t('a cidade de origem mudou de dono')); continue; }
+        if (r.kind === 'domestic' && B.owner !== p.id) { this.cancelRoute(r, PP.t('{c} mudou de dono', { c: B.name })); continue; }
+        if (r.kind === 'foreign' && (B.owner === p.id || B.owner !== r.partner)) { this.cancelRoute(r, PP.t('{c} mudou de dono', { c: B.name })); continue; }
+        if (r.kind === 'foreign' && this.atWar(p.id, B.owner)) { this.cancelRoute(r, PP.t('guerra')); continue; }
         const search = this.tradeSearch(p.id, A, PP.ROUTES.maxLen);
         const d = search.dist[B.y * this.W + B.x];
         const was = r.active;
         if (d < 0) {
           r.active = false; r.threat = false;
           if (was) {
-            this.log(`A rota entre ${A.name} e ${B.name} foi interrompida (estrada cortada ou bloqueio).`, p.id);
+            this.log(PP.t('A rota entre {a} e {b} foi interrompida (estrada cortada ou bloqueio).', { a: A.name, b: B.name }), p.id);
             this.emit('routeBlocked', { route: r });
           }
           continue;
@@ -427,7 +427,7 @@
           const t = this.tiles[i];
           if (!this.protectedTile(p.id, t)) { r.threat = true; break; }
         }
-        if (!was) { this.log(`A rota entre ${A.name} e ${B.name} foi restabelecida.`, p.id); this.emit('routeRestored', { route: r }); }
+        if (!was) { this.log(PP.t('A rota entre {a} e {b} foi restabelecida.', { a: A.name, b: B.name }), p.id); this.emit('routeRestored', { route: r }); }
         r.age++;
         if (r.kind === 'foreign') {
           this.remember(B.owner, p.id, 'route'); this.remember(p.id, B.owner, 'route');
@@ -514,7 +514,7 @@
       else if (t.road && (hostile(t.owner) || t.owner === -1)) r.what = 'road';
       if (!r.what) return r;
       r.visible = true;
-      if (!u.canAttack || u.attacked) { r.reason = 'A unidade já agiu neste turno'; return r; }
+      if (!u.canAttack || u.attacked) { r.reason = PP.t('A unidade já agiu neste turno'); return r; }
       r.ok = true;
       return r;
     },
@@ -529,14 +529,14 @@
       let victim = t.owner;
       let what = '';
       if (chk.what === 'fort') { victim = t.fort.owner; what = PP.FORTS[t.fort.type].name; t.fort = null; }
-      else if (chk.what === 'imp') { what = (PP.IMPROVEMENTS[t.imp] || { name: 'melhoria' }).name; t.pillaged = true; }
-      else { what = 'estrada'; t.road = false; }
+      else if (chk.what === 'imp') { what = PP.IMPROVEMENTS[t.imp] ? PP.IMPROVEMENTS[t.imp].name : PP.t('melhoria'); t.pillaged = true; }
+      else { what = PP.t('estrada'); t.road = false; }
       p.stars += loot;
       p.stats.pillaged = (p.stats.pillaged || 0) + 1;
       u.canAttack = false; u.attacked = true; u.mp = 0; u.moved = true; u.fortified = false;
       this.invalidate();
       const vName = victim >= 0 ? this.players[victim].name : null;
-      this.log(`${p.name} saqueou ${what}${vName ? ' de ' + vName : ''} (+${loot}★).`, victim >= 0 ? [p.id, victim] : p.id);
+      this.log(vName ? PP.t('{p} saqueou {w} de {v} (+{n}★).', { p: p.name, w: what, v: vName, n: loot }) : PP.t('{p} saqueou {w} (+{n}★).', { p: p.name, w: what, n: loot }), victim >= 0 ? [p.id, victim] : p.id);
       this.hook('pillaged', u, t, chk.what, victim);
       this.emit('pillage', { unit: u, tile: t, what: chk.what, loot, victim });
       return true;
@@ -551,8 +551,8 @@
       if (a.repair) {
         if (!t.pillaged || t.owner !== p.id) return r;
         r.visible = true;
-        if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-        if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+        if (occ && occ.owner !== p.id) { r.reason = PP.t('Casa ocupada pelo inimigo'); return r; }
+        if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
         r.ok = true;
         return r;
       }
@@ -565,14 +565,14 @@
       else if (t.fort) return r;
       r.visible = true;
       if (t.landmark === 'passo' && a.fort !== 'tower') r.cost = Math.ceil(a.cost / 2);
-      if (a.tech && !this.has(p, a.tech)) { r.reason = 'Requer ' + PP.TECH[a.tech].name; r.locked = true; return r; }
+      if (a.tech && !this.has(p, a.tech)) { r.reason = PP.t('Requer {x}', { x: PP.TECH[a.tech].name }); r.locked = true; return r; }
       if (!a.upgradeOf) {
-        if (this.neighbors(t).some(n => n.fort)) { r.reason = 'Muito perto de outra fortificação'; return r; }
+        if (this.neighbors(t).some(n => n.fort)) { r.reason = PP.t('Muito perto de outra fortificação'); return r; }
         const lim = this.fortLimit(p.id);
-        if (this.fortCount(p.id) >= lim) { r.reason = `Limite de fortificações (${lim})`; return r; }
+        if (this.fortCount(p.id) >= lim) { r.reason = PP.t('Limite de fortificações ({n})', { n: lim }); return r; }
       }
-      if (occ && occ.owner !== p.id) { r.reason = 'Casa ocupada pelo inimigo'; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (occ && occ.owner !== p.id) { r.reason = PP.t('Casa ocupada pelo inimigo'); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     },
@@ -581,11 +581,11 @@
       p.stars -= chk.cost;
       if (a.repair) {
         t.pillaged = false;
-        this.log(`${p.name} reparou ${(PP.IMPROVEMENTS[t.imp] || { name: 'a melhoria' }).name}.`, p.id);
+        this.log(PP.t('{p} reparou {w}.', { p: p.name, w: PP.IMPROVEMENTS[t.imp] ? PP.IMPROVEMENTS[t.imp].name : PP.t('melhoria') }), p.id);
       } else {
         t.fort = { type: a.fort, owner: p.id, since: this.turn };
         if (!a.upgradeOf) p.stats.forts = (p.stats.forts || 0) + 1;
-        this.log(`${p.name} ergueu ${PP.FORTS[a.fort].name}.`, p.id);
+        this.log(PP.t('{p} ergueu {f}.', { p: p.name, f: PP.FORTS[a.fort].name }), p.id);
       }
       p.stats.built++;
       this.invalidate();
@@ -673,7 +673,7 @@
         if (r.a === c.id || r.b === c.id) {
           const keep = r.kind === 'foreign' && r.b === c.id && !g.atWar(r.owner, p.id) && r.owner !== p.id;
           if (keep) r.partner = p.id;
-          else g.cancelRoute(r, `${c.name} foi conquistada`);
+          else g.cancelRoute(r, PP.t('{c} foi conquistada', { c: c.name }));
         }
       }
     },
@@ -684,12 +684,12 @@
       const old = t.fort.owner;
       t.fort.owner = u.owner;
       g.invalidate();
-      g.log(`${g.players[u.owner].name} tomou ${PP.FORTS[t.fort.type].name} de ${g.players[old].name}.`, [u.owner, old]);
+      g.log(PP.t('{p} tomou {f} de {o}.', { p: g.players[u.owner].name, f: PP.FORTS[t.fort.type].name, o: g.players[old].name }), [u.owner, old]);
       g.emit('fortTaken', { tile: t, from: old, to: u.owner });
     },
     war(g, a, b) {
       for (const r of (g.routes || []).slice()) {
-        if (r.kind === 'foreign' && ((r.owner === a && r.partner === b) || (r.owner === b && r.partner === a))) g.cancelRoute(r, 'guerra');
+        if (r.kind === 'foreign' && ((r.owner === a && r.partner === b) || (r.owner === b && r.partner === a))) g.cancelRoute(r, PP.t('guerra'));
       }
     },
     eliminated(g, p) {

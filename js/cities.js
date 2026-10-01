@@ -28,13 +28,13 @@
     // ------------------------------------------------------------ Especialização
     specCheck(p, c, spec) {
       const r = { ok: false, reason: '', cost: c && c.spec ? PP.SPEC_COST.change : PP.SPEC_COST.first };
-      if (!c || c.owner !== p.id) { r.reason = 'Cidade inválida'; return r; }
-      if (!PP.SPECS[spec]) { r.reason = 'Especialização desconhecida'; return r; }
-      if (c.spec === spec) { r.reason = 'Especialização atual'; r.current = true; return r; }
-      if (c.level < PP.SPEC_COST.minLevel) { r.reason = `Requer nível ${PP.SPEC_COST.minLevel}`; return r; }
-      if (PP.SPECS[spec].coastal && !this.isCoastal(c)) { r.reason = 'Precisa estar no litoral'; r.locked = true; return r; }
-      if (c.occupied > 0) { r.reason = 'Cidade sob ocupação'; return r; }
-      if (p.stars < r.cost) { r.reason = 'Faltam estrelas'; return r; }
+      if (!c || c.owner !== p.id) { r.reason = PP.t('Cidade inválida'); return r; }
+      if (!PP.SPECS[spec]) { r.reason = PP.t('Especialização desconhecida'); return r; }
+      if (c.spec === spec) { r.reason = PP.t('Especialização atual'); r.current = true; return r; }
+      if (c.level < PP.SPEC_COST.minLevel) { r.reason = PP.t('Requer nível {n}', { n: PP.SPEC_COST.minLevel }); return r; }
+      if (PP.SPECS[spec].coastal && !this.isCoastal(c)) { r.reason = PP.t('Precisa estar no litoral'); r.locked = true; return r; }
+      if (c.occupied > 0) { r.reason = PP.t('Cidade sob ocupação'); return r; }
+      if (p.stars < r.cost) { r.reason = PP.t('Faltam estrelas'); return r; }
       r.ok = true;
       return r;
     },
@@ -47,7 +47,7 @@
       const was = c.spec;
       c.spec = spec; c.specSince = this.turn; c.growth = 0;
       p.stats.specs = (p.stats.specs || 0) + 1;
-      this.log(`${c.name} tornou-se uma cidade ${PP.SPECS[spec].name.toLowerCase()}.`, p.id);
+      this.log(PP.t('{c} tornou-se uma cidade {s}.', { c: c.name, s: PP.SPECS[spec].name.toLowerCase() }), p.id);
       this.invalidate();
       this.emit('spec', { city: c, spec, was });
       this.refreshVision(p.id);
@@ -136,7 +136,7 @@
         c.metropolis = true;
         c.radius = Math.max(c.radius, 3);
         this.claimTerritory(c);
-        this.log(`${c.name} tornou-se uma Metrópole!`, null);
+        this.log(PP.t('{c} tornou-se uma Metrópole!', { c: c.name }), null);
         return;
       }
       if (!PP.REWARDS[r]) return;
@@ -172,26 +172,26 @@
     loyaltyFactors(c) {
       const f = [];
       const p = this.players[c.owner];
-      f.push(['Base', 45]);
-      if (this.garrisoned(c)) f.push(['Guarnição na cidade', 15]);
-      if (c.buildings.temple) f.push(['Templo', 10]);
-      if (c.buildings.guard) f.push(['Guarda da Cidade', 5]);
-      if (this.specActive(c, 'citadel')) f.push(['Cidadela', 10]);
-      if (this.specActive(c, 'aqueduct')) f.push(['Aqueduto', 10]);
-      if (c.spec === 'agricola') f.push(['Cidade agrícola (comida farta)', 5]);
-      if (c.connected) f.push(['Conectada à capital', 5]);
+      f.push([PP.t('Base'), 45]);
+      if (this.garrisoned(c)) f.push([PP.t('Guarnição na cidade'), 15]);
+      if (c.buildings.temple) f.push([PP.BUILDINGS.temple.name, 10]);
+      if (c.buildings.guard) f.push([PP.BUILDINGS.guard.name, 5]);
+      if (this.specActive(c, 'citadel')) f.push([PP.BUILDINGS.citadel.name, 10]);
+      if (this.specActive(c, 'aqueduct')) f.push([PP.BUILDINGS.aqueduct.name, 10]);
+      if (c.spec === 'agricola') f.push([PP.t('Cidade agrícola (comida farta)'), 5]);
+      if (c.connected) f.push([PP.t('Conectada à capital'), 5]);
       const lux = this.luxuryCount ? this.luxuryCount(p) : 0;
-      if (lux) f.push(['Luxos do império', Math.min(10, lux * 5)]);
-      if (this.wonders.colosseum === c.owner) f.push(['Coliseu', 5]);
-      if (this.cities.some(o => o.owner === c.owner && o.milestones && o.milestones.m_breadbasket)) f.push(['Celeiro do Mundo', 5]);
+      if (lux) f.push([PP.t('Luxos do império'), Math.min(10, lux * 5)]);
+      if (this.wonders.colosseum === c.owner) f.push([PP.WONDERS.colosseum.name, 5]);
+      if (this.cities.some(o => o.owner === c.owner && o.milestones && o.milestones.m_breadbasket)) f.push([PP.REWARDS.m_breadbasket.name, 5]);
       const founder = this.players[c.founder];
       if (founder && founder.alive && founder.id !== c.owner) {
         if (this.atWar(c.owner, founder.id)) {
-          if (this.units.some(u => u.owner === founder.id && cheb(u, c) <= 3)) f.push([`Tropas de ${founder.name} por perto`, -15]);
-          else f.push([`Em guerra com ${founder.name}`, -5]);
-        } else f.push([`Paz com ${founder.name}`, 5]);
+          if (this.units.some(u => u.owner === founder.id && cheb(u, c) <= 3)) f.push([PP.t('Tropas de {p} por perto', { p: founder.name }), -15]);
+          else f.push([PP.t('Em guerra com {p}', { p: founder.name }), -5]);
+        } else f.push([PP.t('Paz com {p}', { p: founder.name }), 5]);
       }
-      if (c.occupied > 0) f.push(['Ocupação militar', -10]);
+      if (c.occupied > 0) f.push([PP.t('Ocupação militar'), -10]);
       return f;
     },
 
@@ -210,9 +210,9 @@
     },
 
     cityStatus(c) {
-      if (c.occupied > 0) return { id: 'occupied', name: `Ocupada (${c.occupied} turnos)`, tag: 'bad' };
-      if (c.unrest) return { id: 'unrest', name: c.loyalty < 20 ? 'Rebelião iminente' : 'Resistência', tag: 'bad' };
-      if (c.founder !== c.owner) return { id: 'conquered', name: 'Conquistada', tag: '' };
+      if (c.occupied > 0) return { id: 'occupied', name: PP.t('Ocupada ({n} turnos)', { n: c.occupied }), tag: 'bad' };
+      if (c.unrest) return { id: 'unrest', name: c.loyalty < 20 ? PP.t('Rebelião iminente') : PP.t('Resistência'), tag: 'bad' };
+      if (c.founder !== c.owner) return { id: 'conquered', name: PP.t('Conquistada'), tag: '' };
       return null;
     },
 
@@ -226,7 +226,7 @@
           c.occupied--;
           if (c.occupied === 0) {
             if (c.loyalty >= 50) this.integrateCity(c);
-            else { c.unrest = true; this.log(`${c.name} resiste ao domínio de ${p.name}.`, p.id); this.emit('unrest', { city: c }); }
+            else { c.unrest = true; this.log(PP.t('{c} resiste ao domínio de {p}.', { c: c.name, p: p.name }), p.id); this.emit('unrest', { city: c }); }
           }
         } else if (c.unrest) {
           if (c.loyalty >= 60) this.integrateCity(c);
@@ -241,7 +241,7 @@
       c.loyalty = Math.max(c.loyalty, 60);
       const st = this.players[c.owner].stats;
       st.integrated = (st.integrated || 0) + 1;
-      this.log(`${c.name} foi integrada ao império de ${this.players[c.owner].name}.`, c.owner);
+      this.log(PP.t('{c} foi integrada ao império de {p}.', { c: c.name, p: this.players[c.owner].name }), c.owner);
       this.emit('integrated', { city: c });
     },
 
@@ -253,14 +253,14 @@
       if (founder && founder.alive && founder.id !== c.owner) {
         this.transferCity(c, founder.id);
         c.loyalty = 70; c.occupied = 0; c.unrest = false;
-        this.log(`${c.name} se revoltou e voltou para ${founder.name}!`, null);
+        this.log(PP.t('{c} se revoltou e voltou para {p}!', { c: c.name, p: founder.name }), null);
         this.emit('revolt', { city: c, from: owner.id, to: founder.id });
         this.checkElimination(owner);
         this.checkVictory();
       } else {
         c.pop = 0;
         c.loyalty = 35;
-        this.log(`Revolta em ${c.name}: a cidade perdeu sua população.`, owner.id);
+        this.log(PP.t('Revolta em {c}: a cidade perdeu sua população.', { c: c.name }), owner.id);
         this.emit('revolt', { city: c, from: owner.id, to: owner.id });
       }
     },

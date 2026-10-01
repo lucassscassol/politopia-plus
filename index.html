@@ -17,38 +17,38 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<canvas id="map" aria-label="Mapa do jogo"></canvas>
+<canvas id="map" aria-label="Mapa do jogo" data-i18n-attr="aria-label"></canvas>
 <canvas id="fx" aria-hidden="true"></canvas>
 
 <!-- HUD da partida -->
 <div id="hud" hidden>
   <header id="topbar">
     <div id="tb-tribe" class="tribe-chip"></div>
-    <div class="res res-star" title="Estrelas: pagam unidades, melhorias e construções"><span class="res-ico">★</span><b id="tb-stars">0</b><small id="tb-stars-inc">+0</small></div>
-    <div class="res res-sci" title="Ciência: paga tecnologias"><span class="res-ico" data-icon="ui_tech"></span><b id="tb-sci">0</b><small id="tb-sci-inc">+0</small></div>
+    <div class="res res-star" title="Estrelas: pagam unidades, melhorias e construções" data-i18n-attr="title"><span class="res-ico">★</span><b id="tb-stars">0</b><small id="tb-stars-inc">+0</small></div>
+    <div class="res res-sci" title="Ciência: paga tecnologias" data-i18n-attr="title"><span class="res-ico" data-icon="ui_tech"></span><b id="tb-sci">0</b><small id="tb-sci-inc">+0</small></div>
     <button type="button" id="tb-event" class="res res-event" hidden></button>
-    <div class="res res-turn"><span class="res-lbl">Turno</span><b id="tb-turn">1</b></div>
-    <button id="btn-menu" class="icon-btn" type="button" aria-label="Menu" data-icon="ui_menu"></button>
+    <div class="res res-turn"><span class="res-lbl" data-i18n>Turno</span><b id="tb-turn">1</b></div>
+    <button id="btn-menu" class="icon-btn" type="button" aria-label="Menu" data-i18n-attr="aria-label" data-icon="ui_menu"></button>
   </header>
 
-  <nav id="sidebar" aria-label="Painéis">
-    <button type="button" class="side-btn" id="btn-tech"><span data-icon="ui_tech"></span><small>Ciência</small></button>
-    <button type="button" class="side-btn" id="btn-cities"><span data-icon="ui_cities"></span><small>Cidades</small></button>
-    <button type="button" class="side-btn" id="btn-diplo"><span data-icon="ui_diplo"></span><small>Diplomacia</small><i class="dot" id="diplo-dot" hidden></i></button>
-    <button type="button" class="side-btn" id="btn-stats"><span data-icon="ui_stats"></span><small>Placar</small></button>
-    <button type="button" class="side-btn" id="btn-log"><span data-icon="ui_log"></span><small>Crônica</small></button>
-    <button type="button" class="side-btn" id="btn-goals"><span data-icon="ui_objectives"></span><small>Objetivos</small></button>
+  <nav id="sidebar" aria-label="Painéis" data-i18n-attr="aria-label">
+    <button type="button" class="side-btn" id="btn-tech"><span data-icon="ui_tech"></span><small data-i18n>Ciência</small></button>
+    <button type="button" class="side-btn" id="btn-cities"><span data-icon="ui_cities"></span><small data-i18n>Cidades</small></button>
+    <button type="button" class="side-btn" id="btn-diplo"><span data-icon="ui_diplo"></span><small data-i18n>Diplomacia</small><i class="dot" id="diplo-dot" hidden></i></button>
+    <button type="button" class="side-btn" id="btn-stats"><span data-icon="ui_stats"></span><small data-i18n>Placar</small></button>
+    <button type="button" class="side-btn" id="btn-log"><span data-icon="ui_log"></span><small data-i18n>Crônica</small></button>
+    <button type="button" class="side-btn" id="btn-goals"><span data-icon="ui_objectives"></span><small data-i18n>Objetivos</small></button>
   </nav>
 
   <div id="ai-banner" hidden>
-    <span class="spinner"></span><span id="ai-banner-text">Vez da IA…</span>
-    <button type="button" id="btn-skip" class="chip-btn">Acelerar</button>
+    <span class="spinner"></span><span id="ai-banner-text" data-i18n>Vez da IA…</span>
+    <button type="button" id="btn-skip" class="chip-btn" data-i18n>Acelerar</button>
   </div>
 
   <div id="bottom">
     <div id="bottom-row">
-      <button type="button" id="btn-next" class="btn ghost">Próxima unidade</button>
-      <button type="button" id="btn-end" class="btn primary">Fim do turno</button>
+      <button type="button" id="btn-next" class="btn ghost" data-i18n>Próxima unidade</button>
+      <button type="button" id="btn-end" class="btn primary" data-i18n>Fim do turno</button>
     </div>
     <section id="panel" hidden></section>
   </div>
@@ -59,15 +59,19 @@
   <div class="menu-card" id="menu-main">
     <span class="menu-crest" data-icon="ui_war"></span>
     <h1 class="logo">Chamas de <span>Vardren</span></h1>
-    <p class="kicker">Estratégia por turnos</p>
-    <p class="tagline">Seis tribos disputam um mundo coberto de cinzas. Funde cidades, domine o ferro e os cavalos, negocie tratados e erga maravilhas.</p>
+    <p class="kicker" data-i18n>Estratégia por turnos</p>
+    <p class="tagline" data-i18n>Seis tribos disputam um mundo coberto de cinzas. Funde cidades, domine o ferro e os cavalos, negocie tratados e erga maravilhas.</p>
     <div class="menu-actions">
-      <button type="button" id="m-continue" class="btn primary" hidden>Continuar partida</button>
-      <button type="button" id="m-new" class="btn primary">Nova campanha</button>
-      <button type="button" id="m-help" class="btn ghost">Como jogar</button>
-      <button type="button" id="m-ach" class="btn ghost">Conquistas</button>
+      <button type="button" id="m-continue" class="btn primary" hidden data-i18n>Continuar partida</button>
+      <button type="button" id="m-new" class="btn primary" data-i18n>Nova campanha</button>
+      <button type="button" id="m-help" class="btn ghost" data-i18n>Como jogar</button>
+      <button type="button" id="m-ach" class="btn ghost" data-i18n>Conquistas</button>
     </div>
-    <p class="menu-foot">Ao fundo: quatro tribos controladas pela IA disputam um continente.</p>
+    <div class="lang-pick">
+      <span class="lang-lbl" data-i18n>Idioma</span>
+      <div class="seg" id="m-lang" role="group" aria-label="Idioma · Language · Idioma"></div>
+    </div>
+    <p class="menu-foot" data-i18n>Ao fundo: quatro tribos controladas pela IA disputam um continente.</p>
   </div>
   <form id="setup" class="setup-card" hidden></form>
 </section>
@@ -76,6 +80,7 @@
 <div id="modal-root"></div>
 
 <script src="js/util.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/data.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/mapgen.js"></script>
@@ -96,6 +101,8 @@
 <script src="js/scenarios.js"></script>
 <script src="js/ai-strategy.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/lang/en.js"></script>
+<script src="js/lang/es.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/ui-screens.js"></script>

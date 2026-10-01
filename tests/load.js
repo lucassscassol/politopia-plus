@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ENGINE = [
-  'util', 'data', 'mapgen', 'game',
+  'util', 'i18n', 'data', 'mapgen', 'game',
   'diplomacy', 'cities', 'economy', 'combat', 'naval', 'espionage', 'intel', 'events', 'ruins',
-  'victory', 'stats', 'achievements', 'replay', 'scenarios', 'ai-strategy', 'ai',
+  'victory', 'stats', 'achievements', 'replay', 'scenarios', 'ai-strategy', 'ai', 'lang/en', 'lang/es',
 ];
 
 for (const m of ENGINE) {

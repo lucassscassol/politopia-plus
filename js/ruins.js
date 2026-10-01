@@ -9,17 +9,17 @@
     ruinOptions(p, t) {
       const def = PP.RUIN_TYPES[t.ruinType];
       if (!def) return [];
-      const out = [{ id: 'explore', name: 'Explorar', desc: 'Vasculhar com cuidado: uma recompensa aleatória (tesouro, pergaminhos, tecnologia, veterano, mapa ou sobreviventes).', ok: true }];
+      const out = [{ id: 'explore', name: PP.t('Explorar'), desc: PP.t('Vasculhar com cuidado: uma recompensa aleatória (tesouro, pergaminhos, tecnologia, veterano, mapa ou sobreviventes).'), ok: true }];
       const met = this.players.filter(q => q.alive && q.id !== p.id && p.met[q.id]).length;
-      out.push({ id: 'loot', name: 'Saquear', desc: `+${def.loot}★ agora.` + (met ? ' As tribos que você conhece vão se lembrar disso.' : ''), ok: true });
+      out.push({ id: 'loot', name: PP.t('Saquear'), desc: PP.t('+{n}★ agora.', { n: def.loot }) + (met ? ' ' + PP.t('As tribos que você conhece vão se lembrar disso.') : ''), ok: true });
       if (def.restore) {
         const r = def.restore;
         const can = !this.isWater(t) && !t.fort && !(r.fort && this.neighbors(t).some(n => n.fort));
-        out.push({ id: 'restore', name: r.label, desc: `Custa ${r.cost}★.` + (r.fort ? ` A casa vira ${PP.FORTS[r.fort].name} seu.` : '') +
-          (r.shrine || r.archive ? ' O santuário dá +1⚗ por turno.' : '') + (r.archive ? ` Ganha +${r.archive}⚗ agora.` : ''),
-          ok: can && p.stars >= r.cost, reason: !can ? 'Não é possível aqui' : p.stars < r.cost ? 'Faltam estrelas' : '' });
+        out.push({ id: 'restore', name: r.label, desc: PP.t('Custa {n}★.', { n: r.cost }) + (r.fort ? ' ' + PP.t('A casa vira {f} seu.', { f: PP.FORTS[r.fort].name }) : '') +
+          (r.shrine || r.archive ? ' ' + PP.t('O santuário dá +1⚗ por turno.') : '') + (r.archive ? ' ' + PP.t('Ganha +{n}⚗ agora.', { n: r.archive }) : ''),
+          ok: can && p.stars >= r.cost, reason: !can ? PP.t('Não é possível aqui') : p.stars < r.cost ? PP.t('Faltam estrelas') : '' });
       }
-      if (def.honor) out.push({ id: 'honor', name: 'Honrar o túmulo', desc: 'A unidade ganha 2 XP e as outras tribos respeitam o gesto.', ok: true });
+      if (def.honor) out.push({ id: 'honor', name: PP.t('Honrar o túmulo'), desc: PP.t('A unidade ganha 2 XP e as outras tribos respeitam o gesto.'), ok: true });
       return out;
     },
 
@@ -62,23 +62,23 @@
       if (choice === 'loot') {
         p.stars += def.loot;
         for (const q of others) this.remember(q.id, p.id, 'plunder', def.rep);
-        text = `saqueou ${def.name} (+${def.loot}★)`;
+        text = PP.t('saqueou {r} (+{n}★)', { r: def.name, n: def.loot });
       } else if (choice === 'restore') {
         const r = def.restore;
         p.stars -= r.cost;
         if (r.fort) t.fort = { type: r.fort, owner: p.id, since: this.turn };
         if (r.shrine || r.archive) t.shrine = p.id;
         if (r.archive) p.science += r.archive;
-        text = `restaurou ${def.name}`;
+        text = PP.t('restaurou {r}', { r: def.name });
       } else if (choice === 'honor') {
         if (u && !u.dead) this.gainXp(u, 2);
         for (const q of others) this.remember(q.id, p.id, 'honored');
-        text = `honrou ${def.name}`;
+        text = PP.t('honrou {r}', { r: def.name });
       }
       t.ruin = false;
       t.ruinType = null;
       this.invalidate();
-      this.log(`${p.name} ${text}.`, p.id);
+      this.log(PP.t('{p} {text}.', { p: p.name, text }), p.id);
       this.hook('ruin', p, t, choice);
       this.emit('ruin', { player: p.id, tile: t, reward: choice, text });
       this.refreshVision(p.id);

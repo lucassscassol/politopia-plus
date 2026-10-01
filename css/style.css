@@ -404,6 +404,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-vari
 .menu-actions { display: grid; gap: 10px; }
 .menu-actions .btn { padding: 13px 18px; }
 .menu-foot { color: var(--faint); font-size: 0.82rem; margin: 18px 0 0; font-style: italic; }
+/* Seletor de idioma do menu principal */
+.lang-pick { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+.lang-lbl { font-family: var(--font-display); font-weight: 700; font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+.lang-pick .seg { justify-content: center; }
+.lang-pick .seg button { padding: 5px 11px; font-size: 0.85rem; }
 
 .setup-card {
   width: min(100%, 780px); max-height: 100%;
