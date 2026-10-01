@@ -208,6 +208,18 @@
       this.dirty = true;
     }
 
+    // Leva a superfície da casa (x, y) até o ponto (sx, sy) da tela. Usado para centralizar a seleção na parte do
+    // mapa que o HUD não cobre (o centro da tela pode estar atrás do painel).
+    placeAt(x, y, sx, sy, animate) {
+      const w = this.worldOf(x, y);
+      const t = this.game && this.game.tile(x, y);
+      const wy = w.y + (t ? this.topY(t) : -LH);
+      const tx = w.x - (sx - this.w / 2) / this.cam.z, ty = wy - (sy - this.h / 2) / this.cam.z;
+      if (animate) this.camAnim = { fx: this.cam.x, fy: this.cam.y, tx, ty, t0: performance.now(), dur: 320 };
+      else { this.camAnim = null; this.cam.x = tx; this.cam.y = ty; }
+      this.dirty = true;
+    }
+
     fitZoom() {
       const tilesAcross = this.w < 600 ? 5.2 : this.w < 1100 ? 8 : 11;
       this.cam.z = PP.clamp(this.w / (tilesAcross * TW), 0.3, 1.6);
@@ -233,8 +245,10 @@
     clampCam() {
       if (!this.game) return;
       const W = this.game.W, H = this.game.H;
-      this.cam.x = PP.clamp(this.cam.x, -H * TW / 2, W * TW / 2);
-      this.cam.y = PP.clamp(this.cam.y, -TH, (W + H) * TH / 2);
+      // folga de meia tela: as casas da borda do mapa ainda podem ficar no centro da área que o HUD não cobre
+      const px = this.w * 0.3 / this.cam.z, py = this.h * 0.45 / this.cam.z;
+      this.cam.x = PP.clamp(this.cam.x, -H * TW / 2 - px, W * TW / 2 + px);
+      this.cam.y = PP.clamp(this.cam.y, -TH - py, (W + H) * TH / 2 + py);
     }
 
     clearHighlights() { this.hl = { selected: null, reach: null, attack: null, convert: null, hover: this.hl ? this.hl.hover : null }; this.dirty = true; }

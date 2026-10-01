@@ -11,6 +11,24 @@
   const SCI = '⚗︎';
   const ERA = () => ['', PP.t('Era I · Tribal'), PP.t('Era II · Bronze'), PP.t('Era III · Reinos'), PP.t('Era IV · Pólvora')];
 
+  // Redesenhar com innerHTML recria as áreas roláveis e a rolagem voltaria ao início. keepScroll guarda a rolagem
+  // de root e das áreas roláveis dentro dele, roda o redesenho e devolve cada uma à posição anterior.
+  const SCROLLERS = '.setup-b, .modal-b, .acts, .tbl-wrap, .log-list, .list';
+  function keepScroll(root, redraw) {
+    const saved = [];
+    if (root) {
+      saved.push([null, root.scrollTop, root.scrollLeft]);
+      root.querySelectorAll(SCROLLERS).forEach((el, i) => { if (el.scrollTop || el.scrollLeft) saved.push([i, el.scrollTop, el.scrollLeft]); });
+    }
+    redraw();
+    if (!root) return;
+    const now = root.querySelectorAll(SCROLLERS);
+    for (const [i, top, left] of saved) {
+      const el = i == null ? root : now[i];
+      if (el) { el.scrollTop = top; el.scrollLeft = left; }
+    }
+  }
+
   function store(key, val) { try { if (val == null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } }
   function load(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
 
@@ -310,12 +328,14 @@
         victories: Object.assign({ ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true }, saved.lastVictories || {}),
         events: saved.lastEvents !== false,
       };
-      this.renderSetup();
+      this.renderSetup(false);
     }
 
-    renderSetup() {
-      const s = this.setupState;
+    // keep: mantém a rolagem da tela (ao escolher uma opção); false ao abrir a tela, que começa do topo
+    renderSetup(keep) {
       const f = $('#setup');
+      if (keep !== false) { keepScroll(f, () => this.renderSetup(false)); return; }
+      const s = this.setupState;
       const me = s.slots[0];
       const tribeCards = PP.TRIBE_IDS.map(id => {
         const t = PP.TRIBES[id];
@@ -664,9 +684,53 @@
     }
 
     select(t, mode) {
+      const prev = this.sel;
       this.sel = { tile: t, mode };
       this.confirmDisband = null;
-      this.refreshSelection();
+      // objeto novo: centraliza na área livre; mesma casa (unidade ↔ casa): só se ficou escondida
+      this.refreshSelection(!prev || prev.tile !== t ? 'center' : 'reveal');
+    }
+
+    // Partes do mapa que o HUD não cobre: acima do painel (celular) ou ao lado dele (computador, onde o painel
+    // fica no canto inferior esquerdo). Coordenadas da tela do mapa.
+    freeAreas() {
+      const r = this.r, cv = this.canvas.getBoundingClientRect();
+      const box = sel => {
+        const e = $(sel);
+        if (!e || e.hidden) return null;
+        const b = e.getBoundingClientRect();
+        return b.width > 0 && b.height > 0 ? { left: b.left - cv.left, right: b.right - cv.left, top: b.top - cv.top, bottom: b.bottom - cv.top } : null;
+      };
+      const bar = box('#topbar'), side = box('#sidebar'), panel = box('#panel'), row = box('#bottom-row');
+      const top = bar ? Math.max(0, bar.bottom) : 0;
+      const dock = side && side.right - side.left > side.bottom - side.top; // abas no rodapé (celular)
+      const left = side && !dock ? side.right : 0;
+      let floor = r.h;
+      if (dock) floor = Math.min(floor, side.top);
+      if (row) floor = Math.min(floor, row.top);
+      const areas = [{ left, right: r.w, top, bottom: panel ? Math.min(floor, panel.top) : floor }];
+      if (panel) areas.push({ left: Math.max(left, panel.right), right: r.w, top, bottom: row && row.left >= panel.right ? row.top : floor });
+      const size = a => Math.max(0, a.right - a.left) * Math.max(0, a.bottom - a.top);
+      const ok = areas.filter(a => a.right - a.left >= 120 && a.bottom - a.top >= 100).sort((a, b) => size(b) - size(a));
+      return ok.length ? ok : [{ left: 0, right: r.w, top: 0, bottom: r.h }];
+    }
+
+    // Mantém o objeto selecionado à vista. 'center': centraliza na maior área livre se ele não estiver perto do
+    // centro dela; 'reveal': só move a câmera se o painel ou as barras estiverem cobrindo o objeto.
+    focusSelection(how) {
+      const s = this.sel, r = this.r;
+      if (!how || !s || !this.game || this.demo) return;
+      const t = s.tile, z = r.cam.z;
+      const p = r.tileScreen(t.x, t.y);
+      const lift = 18 * z; // o escudo da unidade e as construções ficam acima do centro da casa
+      const o = { x: p.x, y: p.y - lift, hw: 34 * z, top: 52 * z, bottom: 22 * z };
+      const areas = this.freeAreas();
+      const inside = a => o.x - o.hw >= a.left + 4 && o.x + o.hw <= a.right - 4 && o.y - o.top >= a.top + 4 && o.y + o.bottom <= a.bottom - 4;
+      const a = areas[0];
+      const cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2;
+      if (how === 'reveal' && areas.some(inside)) return;
+      if (how === 'center' && inside(a) && Math.abs(o.x - cx) <= (a.right - a.left) / 4 && Math.abs(o.y - cy) <= (a.bottom - a.top) / 4) return;
+      r.placeAt(t.x, t.y, cx, cy + lift, !this.reduced);
     }
 
     deselect() {
@@ -675,7 +739,7 @@
       this.hidePanel();
     }
 
-    refreshSelection() {
+    refreshSelection(focus) {
       const g = this.game, r = this.r;
       r.clearHighlights();
       const s = this.sel;
@@ -698,6 +762,7 @@
       }
       r.dirty = true;
       this.renderPanel();
+      this.focusSelection(focus);
     }
 
     nextUnit() {
@@ -709,13 +774,14 @@
       const i = list.findIndex(u => u.id === curId);
       const u = list[(i + 1) % list.length];
       this.select(g.tileAt(u), 'unit');
-      this.r.centerOn(u.x, u.y, true);
+      this.focusSelection('center');
     }
 
     afterAction() {
       if (!this.game) return;
       this.renderHud();
-      if (this.sel) this.refreshSelection();
+      // depois de mover ou agir, a seleção segue a unidade; a câmera só anda se o painel passar a cobri-la
+      if (this.sel) this.refreshSelection('reveal');
       this.checkRewards();
       if (this.game.over) { this.busy = true; this.r.waitIdle().then(() => { this.busy = false; this.renderHud(); this.showGameOver(); }); }
       clearTimeout(this.saveTimer);
@@ -772,7 +838,10 @@
       if (!p.explored[idx]) html = this.head(ico('ui_fog'), PP.t('Terras desconhecidas'), PP.t('Mova unidades para perto para revelar.'), null);
       else if (s.mode === 'unit') html = this.unitPanel(this.visibleUnitAt(t));
       else html = this.tilePanel(t);
-      panel.innerHTML = html;
+      const same = this.panelFor === idx + ':' + s.mode && !panel.hidden;
+      this.panelFor = idx + ':' + s.mode;
+      if (same) keepScroll(panel, () => { panel.innerHTML = html; });
+      else { panel.innerHTML = html; panel.scrollTop = 0; }
       panel.hidden = false;
     }
 
@@ -1058,11 +1127,8 @@
     replaceModal(kind, html, opts) {
       const m = this.modals.find(x => x.kind === kind);
       if (!m) return this.openModal(kind, html, opts);
-      const body = m.el.querySelector('.modal-b');
-      const scroll = body ? body.scrollTop : 0;
-      m.el.querySelector('.modal').innerHTML = html;
-      const nb = m.el.querySelector('.modal-b');
-      if (nb) nb.scrollTop = scroll;
+      const box = m.el.querySelector('.modal');
+      keepScroll(box, () => { box.innerHTML = html; });
       return m.el;
     }
 
@@ -1132,8 +1198,8 @@
         case 'goto': {
           const c = g.cityMap[+d.city];
           this.closeModal('cities');
-          this.r.centerOn(c.x, c.y, true);
           this.select(g.tile(c.x, c.y), 'tile');
+          this.focusSelection('center');
           break;
         }
         case 'peace': {
