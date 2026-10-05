@@ -12,7 +12,7 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
-- **Android:** instale o APK (`tools/build-apk.sh` gera `dist/ChamasDeVardren-<versão>.apk`; veja [Android (APK)](#android-apk)). Funciona sem internet.
+- **Android:** baixe e instale [`apk/ChamasDeVardren-2.1.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.1.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `O` objetivos, `Esc` fecha janelas.
 
@@ -135,6 +135,7 @@ js/ui.js              entrada, painéis, modais, fluxo de turnos, passa-e-joga
 js/ui-screens.js      telas dos sistemas novos (objetivos, comércio, espionagem, replay, conquistas...)
 js/ui-realm.js        administração e personagens na cidade, resumo do reino e avisos
 js/main.js            inicialização
+apk/                  APK pronto para instalar
 android/              app Android: manifesto, MainActivity (WebView), ícones, fontes locais e a chave de desenvolvimento
 tools/build-apk.sh    gera o APK sem Gradle (ferramentas Android do Ubuntu)
 tools/android-icons.js  gera os ícones do app a partir de assets/icon.svg (Playwright)
