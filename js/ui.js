@@ -1127,6 +1127,19 @@
 
     closeAllModals() { while (this.modals.length) { const m = this.modals.pop(); m.el.remove(); } }
 
+    // Botão voltar do Android (APK): fecha o que estiver por cima; devolve false quando não há nada a fechar
+    handleBack() {
+      if (document.querySelector('.pass')) return true;
+      if (this.modals.length) { this.closeModal(); return true; }
+      if (!this.game) {
+        if (!$('#setup').hidden) { $('#setup').hidden = true; $('#menu-main').hidden = false; return true; }
+        return false;
+      }
+      if (this.sel) { this.deselect(); return true; }
+      this.openGameMenu();
+      return true;
+    }
+
     replaceModal(kind, html, opts) {
       const m = this.modals.find(x => x.kind === kind);
       if (!m) return this.openModal(kind, html, opts);

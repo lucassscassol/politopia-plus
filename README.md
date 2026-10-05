@@ -12,6 +12,7 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
+- **Android:** instale o APK (`tools/build-apk.sh` gera `dist/ChamasDeVardren-<versão>.apk`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `O` objetivos, `Esc` fecha janelas.
 
@@ -134,6 +135,9 @@ js/ui.js              entrada, painéis, modais, fluxo de turnos, passa-e-joga
 js/ui-screens.js      telas dos sistemas novos (objetivos, comércio, espionagem, replay, conquistas...)
 js/ui-realm.js        administração e personagens na cidade, resumo do reino e avisos
 js/main.js            inicialização
+android/              app Android: manifesto, MainActivity (WebView), ícones, fontes locais e a chave de desenvolvimento
+tools/build-apk.sh    gera o APK sem Gradle (ferramentas Android do Ubuntu)
+tools/android-icons.js  gera os ícones do app a partir de assets/icon.svg (Playwright)
 tests/load.js         carrega o motor no Node na mesma ordem do index.html
 tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, saves antigos...)
 tests/sim.js          partidas IA × IA com checagens de integridade e salvar/carregar
@@ -154,6 +158,19 @@ O jogo vem em português (padrão), inglês e espanhol; o idioma é escolhido no
 
 O idioma não altera a jogabilidade (o teste joga a mesma partida nos três idiomas e compara o resultado). Entradas da Crônica já registradas continuam no idioma em que foram escritas; nomes de tribos e cidades são nomes próprios e não mudam.
 
+## Android (APK)
+
+O APK é uma casca nativa mínima: uma `WebView` em tela cheia (`android/src/.../MainActivity.java`) que roda os mesmos arquivos da versão web, empacotados dentro do app. Nada é baixado: as fontes Cinzel e Alegreya Sans vão junto (`android/fonts/`), e os arquivos são servidos em `https://appassets.androidplatform.net/`, uma origem fixa do próprio app, para que o salvamento automático (localStorage) persista entre aberturas. O botão voltar do Android fecha a janela aberta, depois a seleção, depois abre o Menu da partida; no menu principal, manda o app para o fundo. Ao sair do app no seu turno, a partida é gravada na hora.
+
+```
+sudo apt-get install aapt apksigner zipalign dalvik-exchange android-sdk-platform-23 openjdk-17-jdk-headless
+tools/build-apk.sh          # → dist/ChamasDeVardren-<versão>.apk (versão e versionCode vêm do package.json)
+```
+
+O build não usa Gradle nem o SDK do Google, só as ferramentas Android empacotadas no Ubuntu/Debian; Android 5.0 (API 21) ou mais novo. O APK sai assinado com `android/vardren-debug.keystore` (senha `vardren`), uma chave de desenvolvimento **pública**: ela serve para que cada versão nova instale por cima da anterior sem apagar as partidas salvas, mas não protege nada e não serve para a Play Store. Para publicar na loja, gere uma chave própria e guarde-a fora do repositório (`VARDREN_KEYSTORE=... VARDREN_KEY_ALIAS=... VARDREN_KEY_PASS=... tools/build-apk.sh`); a loja também pede o formato AAB, que este script não gera. Trocar de chave obriga a desinstalar a versão antiga, o que apaga as partidas salvas no aparelho.
+
+Para instalar no celular: copie o APK, abra-o e permita "instalar apps desconhecidos" para o app que abriu o arquivo (navegador ou gerenciador de arquivos).
+
 ## Testes
 
 ```
@@ -168,3 +185,5 @@ O simulador verifica a cada turno a consistência do tabuleiro (grade de unidade
 ## Créditos
 
 Ícones de [game-icons.net](https://game-icons.net), licença [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), pelos autores Lorc, Delapouite, Skoll, Caro Asercion, Cathelineau, Darkzaitzev, Faithtoken, HeavenlyDog e Sbed. Para trocar um ícone, edite `tools/icons.json` e rode `python3 tools/build-icons.py`.
+
+Fontes [Cinzel](https://github.com/NDISCOVER/Cinzel) e [Alegreya Sans](https://github.com/huertatipografica/Alegreya-Sans), licença SIL Open Font License 1.1 (cópias das licenças em `android/fonts/`, empacotadas no APK).
