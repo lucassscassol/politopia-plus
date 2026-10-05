@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -39,6 +40,8 @@ public class MainActivity extends Activity {
         "(function(){try{return !!(window.PP&&PP.ui&&PP.ui.handleBack&&PP.ui.handleBack());}catch(e){return false;}})()";
     private static final String JS_SAVE =
         "(function(){try{if(window.PP&&PP.ui&&PP.ui.myTurn&&PP.ui.myTurn())PP.ui.save();}catch(e){}})()";
+    private static final String JS_MUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(true);}catch(e){}})()";
+    private static final String JS_UNMUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(false);}catch(e){}})()";
 
     private WebView web;
 
@@ -46,6 +49,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
+        // os botões de volume controlam o som do jogo (mídia), não a campainha
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         web = new WebView(this);
@@ -82,15 +87,19 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (web != null) web.onResume();
+        if (web != null) {
+            web.onResume();
+            web.evaluateJavascript(JS_UNMUTE, null);
+        }
         hideSystemUi();
     }
 
     @Override
     protected void onPause() {
-        // grava a partida na hora (o jogo já salva a cada ação, com um pequeno atraso)
+        // grava a partida na hora (o jogo já salva a cada ação, com um pequeno atraso) e silencia o som
         if (web != null) {
             web.evaluateJavascript(JS_SAVE, null);
+            web.evaluateJavascript(JS_MUTE, null);
             web.onPause();
         }
         super.onPause();

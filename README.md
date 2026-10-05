@@ -12,7 +12,7 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
-- **Android:** baixe e instale [`apk/ChamasDeVardren-2.1.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.1.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
+- **Android:** baixe e instale [`apk/ChamasDeVardren-2.2.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.2.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `O` objetivos, `Esc` fecha janelas.
 
@@ -75,6 +75,14 @@ A partida é salva automaticamente no aparelho a cada turno. Saves, opções e c
 
 A organização do reino pode ser desligada na criação da partida. Partidas criadas antes desta versão não têm desordem nem distância, mas ganham a Era V, as construções e os personagens.
 
+## Som (2.2)
+
+Todo o som é sintetizado pelo próprio jogo (`js/audio.js`), sem arquivos de áudio: o APK continua pequeno e não há licenças de terceiros.
+
+- **Efeitos:** espadas, arcos, mosquetes, catapultas, canhões, passos, cascos, remos, marteladas de obra, moedas, sinos de cidade fundada e de turno, trompas de conquista e de promoção, tambores de guerra, harpa de tecnologia, coro de maravilha, gongo dos eventos mundiais e fanfarras de vitória e derrota (47 sons, a maioria com 2 ou 3 variações). Cada som acompanha a animação (o golpe soa quando a tropa acerta), vem do lado da tela onde a ação acontece e só toca para o que você enxerga.
+- **Música:** composta enquanto toca, em ré menor: bordão grave, alaúde em arpejos e melodias e tambor de moldura. Muda de progressão e textura a cada 4 compassos e fica mais marcada (tambor em pulso) enquanto houver combate envolvendo você.
+- **Opções:** liga/desliga de efeitos e música no menu principal; no Menu da partida, volume Desligado, Baixo, Médio ou Alto para cada um (guardado no aparelho). O som começa no primeiro toque (regra dos navegadores) e para quando o app ou a aba vai para o fundo; no Android, os botões de volume controlam o som do jogo.
+
 ### Tribos
 
 | Tribo | Começa com | Vantagem | Mecânica única (2.0) |
@@ -134,6 +142,8 @@ js/render.js          renderizador isométrico em Canvas com animações
 js/ui.js              entrada, painéis, modais, fluxo de turnos, passa-e-joga
 js/ui-screens.js      telas dos sistemas novos (objetivos, comércio, espionagem, replay, conquistas...)
 js/ui-realm.js        administração e personagens na cidade, resumo do reino e avisos
+js/audio.js           som: síntese dos efeitos, música generativa e motor Web Audio (a síntese roda no Node)
+js/ui-audio.js        som na interface: eventos da partida → efeitos, cliques, opções de volume
 js/main.js            inicialização
 apk/                  APK pronto para instalar
 android/              app Android: manifesto, MainActivity (WebView), ícones, fontes locais e a chave de desenvolvimento
@@ -144,6 +154,7 @@ tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval,
 tests/sim.js          partidas IA × IA com checagens de integridade e salvar/carregar
 tests/balance.js      simulações de balanceamento com todas as vitórias e cenários
 tests/i18n.js         cobertura dos idiomas e partida idêntica em qualquer idioma
+tests/audio.js        todos os efeitos sintetizados (sem NaN, estouro, DC ou estalos), afinação das notas e escala da música
 tests/i18n-keys.js    coleta as chaves de texto do código e do index.html
 tests/i18n-data.js    lista os textos das regras que cada idioma traduz
 tests/fixtures/       saves da versão 1 usados no teste de compatibilidade
@@ -175,7 +186,7 @@ Para instalar no celular: copie o APK, abra-o e permita "instalar apps desconhec
 ## Testes
 
 ```
-npm test                    # testes dos sistemas + idiomas + 8 partidas IA × IA de até 70 turnos
+npm test                    # testes dos sistemas + idiomas + som + 8 partidas IA × IA de até 70 turnos
 npm run balance             # 12 partidas com todas as vitórias e cenários, com estatísticas
 node tests/systems.js       # só os testes de sistemas (ONLY=texto filtra pelo nome)
 node tests/sim.js 20 80

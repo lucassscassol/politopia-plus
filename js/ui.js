@@ -1510,6 +1510,7 @@
           <div class="field"><span class="lbl">${PP.t('Câmera e ambiente')}</span><div class="seg">
             <button type="button" class="${this.settings.follow ? 'on' : ''}" data-m="follow">${PP.t('Seguir ações da IA')}</button>
             <button type="button" class="${this.settings.ash ? 'on' : ''}" data-m="ash">${PP.t('Cinzas no ar')}</button></div></div>
+          ${this.soundField ? this.soundField() : ''}
           <div class="field"><span class="lbl">${PP.t('Idioma')}</span><div class="seg lang-seg">
             ${Object.keys(PP.LANGS).map(k => `<button type="button" class="${PP.lang === k ? 'on' : ''}" data-m="lang" data-v="${k}" lang="${PP.LANG_LOCALE[k]}">${PP.LANGS[k]}</button>`).join('')}</div></div>
           <p class="note">${PP.t('Partida: mapa {w}×{h} · {type} · IA {diff}', { w: this.game.W, h: this.game.H, type: (PP.MAP_TYPES[o.mapType] || { name: o.mapType }).name, diff: PP.DIFFICULTY[o.difficulty].name })}${o.scenario && o.scenario !== 'normal' ? ' · ' + PP.t('Cenário {x}', { x: PP.SCENARIOS[o.scenario].name }) : ''}. ${PP.t('O jogo salva sozinho a cada turno.')}</p>

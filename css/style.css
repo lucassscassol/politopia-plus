@@ -409,6 +409,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-vari
 .lang-lbl { font-family: var(--font-display); font-weight: 700; font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
 .lang-pick .seg { justify-content: center; }
 .lang-pick .seg button { padding: 5px 11px; font-size: 0.85rem; }
+.lang-pick + .lang-pick { margin-top: 10px; }
 
 .setup-card {
   width: min(100%, 780px); max-height: 100%;
