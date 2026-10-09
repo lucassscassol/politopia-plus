@@ -79,7 +79,11 @@
       g.recordFrame();
       g.mark(winner >= 0 ? `${g.players[winner].name}: ${PP.victoryLabel ? PP.victoryLabel(reason) : reason}` : PP.t('Fim de jogo'), 'end');
     },
-    capture(g, c, old, p) { g.mark(PP.t('{p} conquistou {c} de {o}', { p: p.name, c: c.name, o: old.name }), 'capture'); },
+    capture(g, c, old, p, how) {
+      if (how === 'annex') return; // a anexação marca uma linha só (js/vassals.js)
+      if (how === 'cession') g.mark(PP.t('{o} cedeu {c} a {p}', { p: p.name, c: c.name, o: old.name }), 'capture');
+      else g.mark(PP.t('{p} conquistou {c} de {o}', { p: p.name, c: c.name, o: old.name }), 'capture');
+    },
     found(g, c, p) { g.mark(PP.t('{p} fundou {c}', { p: p.name, c: c.name }), 'found'); },
     war(g, a, b) { g.mark(PP.t('{a} declarou guerra a {b}', { a: g.players[a].name, b: g.players[b].name }), 'war'); },
     treaty(g, a, b, type) { g.mark(`${g.players[a].name} e ${g.players[b].name}: ${PP.RELATIONS[type] ? PP.RELATIONS[type].name : type}`, 'treaty'); },

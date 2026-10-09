@@ -246,5 +246,19 @@
  "u_general": "delapouite/caesar",
  "u_governor": "delapouite/throne-king",
  "u_envoy": "lorc/wax-seal",
- "ui_admin": "delapouite/organigram"
+ "ui_admin": "delapouite/organigram",
+ "ui_realm": "lorc/crown",
+ "gv_tribal": "lorc/totem-head",
+ "gv_monarquia": "lorc/crown",
+ "gv_teocracia": "delapouite/church",
+ "gv_feudalismo": "delapouite/knight-banner",
+ "gv_republica": "delapouite/vote",
+ "gv_imperio": "delapouite/imperial-crown",
+ "ui_tax": "lorc/crown-coin",
+ "ui_loan": "delapouite/receive-money",
+ "d_vassal": "delapouite/kneeling",
+ "d_annex": "lorc/eagle-emblem",
+ "d_independence": "lorc/fist",
+ "d_terms": "delapouite/scroll-quill",
+ "d_release": "delapouite/open-gate"
 }

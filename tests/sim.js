@@ -69,6 +69,18 @@ function validate(g) {
   for (const t of g.tiles) if (t.fort && (!g.players[t.fort.owner] || !g.players[t.fort.owner].alive)) throw new Error('forte sem dono vivo');
   for (const c of g.cities) if (c.loyalty < 0 || c.loyalty > 100 || c.occupied < 0) throw new Error('lealdade inválida ' + c.name);
   for (const p of g.players) if (!p.human && p.pendingRuin) throw new Error('IA com ruína pendente');
+  // governo, tesouro e vassalos
+  for (const p of g.players) {
+    if (p.alive && !g.citiesOf(p.id).length) throw new Error('tribo viva sem cidades ' + p.name);
+    if (!PP.GOVERNMENTS[p.gov] || !PP.TAXES[p.tax]) throw new Error('governo ou imposto inválido ' + p.name);
+    if (p.loan && (p.loan.left <= 0 || p.loan.per <= 0)) throw new Error('empréstimo inválido ' + p.name);
+    if (!p.alive || p.overlord == null) continue;
+    const o = g.players[p.overlord];
+    if (!o || !o.alive) throw new Error('vassalo de tribo morta ' + p.name);
+    if (o.overlord != null) throw new Error('vassalo de vassalo ' + p.name);
+    if (g.relState(p.id, o.id) !== 'alliance') throw new Error('vassalo fora da aliança ' + p.name);
+    for (const r of p.reparations || []) if (!g.players[r.to].alive) throw new Error('reparação para tribo morta ' + p.name);
+  }
 }
 
 (async () => {

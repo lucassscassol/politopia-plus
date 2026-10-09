@@ -194,6 +194,28 @@
         case 'eliminated':
           if (d.player !== v && me && me.met[d.player]) this.soundAt('gong', null, null, { gain: 0.7 });
           break;
+        // governo, tesouro e vassalos (js/government.js e js/vassals.js)
+        case 'gov':
+          if (d.player === v && d.type === 'change') this.soundAt(d.gov === 'imperio' ? 'wonder' : 'seal');
+          else if (d.player === v && d.type === 'stable') this.soundAt('promote');
+          else if (d.type === 'change' && d.gov === 'imperio' && me && me.met[d.player]) this.soundAt('gong', null, null, { gain: 0.7 });
+          break;
+        case 'loan':
+          if (d.player !== v) break;
+          this.soundAt(d.type === 'bankrupt' ? 'lost' : d.type === 'missed' ? 'error' : 'coin');
+          break;
+        case 'vassal':
+          if (d.type === 'new' || d.type === 'annexed') {
+            if (d.overlord === v) this.soundAt(d.type === 'annexed' ? 'wonder' : 'capture');
+            else if (d.vassal === v) this.soundAt('lost');
+          } else if (d.type === 'released' && d.vassal === v) this.soundAt('peace');
+          break;
+        case 'terms':
+          if (d.winner === v || d.loser === v) this.soundAt('seal', null, null, { delay: 350 });
+          break;
+        case 'cession':
+          if (d.to === v || d.from === v) this.soundAt(d.to === v ? 'capture' : 'lost', d.city.x, d.city.y);
+          break;
       }
     },
 

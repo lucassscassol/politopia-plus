@@ -286,6 +286,7 @@
         if (strat === 'dominacao' && op < -40 && myS > theirS * 2) warChance = 0.03;
       }
       if (strat === 'defesa' || strat === 'diplomacia') warChance *= 0.2;
+      if (rel.truce > g.turn) warChance *= 0.05; // trégua depois de uma paz (js/vassals.js)
       if (warChance > 0 && g.rng.next() < warChance) { g.declareWar(p.id, q.id); continue; }
       // propostas pacíficas
       if (rel.state === 'peace' && since >= 3 && op >= -2 && !(strat === 'dominacao' && ai.target === q.id)) {

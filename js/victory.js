@@ -5,7 +5,7 @@
   'use strict';
 
   PP.VICTORIES = {
-    dominacao:     { name: 'Dominação',    icon: 'v_domination', desc: 'Elimine todas as outras tribos.' },
+    dominacao:     { name: 'Dominação',    icon: 'v_domination', desc: 'Elimine todas as outras tribos (ou mantenha todas como suas vassalas por 5 turnos).' },
     pontos:        { name: 'Pontos',       icon: 'v_score',      desc: 'Tenha a maior pontuação quando o limite de turnos acabar.' },
     ciencia:       { name: 'Científica',   icon: 'v_science',    desc: 'Com a árvore de tecnologias completa, conclua as 3 etapas do Grande Observatório numa cidade científica de nível 5 ou mais.' },
     economia:      { name: 'Econômica',    icon: 'v_economy',    desc: 'Acumule estrelas em rotas comerciais e mantenha ao menos uma rota com outra tribo.' },

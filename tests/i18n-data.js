@@ -6,7 +6,7 @@
 const ROOTS = ['TERRAIN', 'RESOURCES', 'STRATEGIC', 'LUXURIES', 'TECH', 'UNITS', 'SKILL_NAMES', 'ABILITIES', 'PROMOTIONS',
   'TILE_ACTION', 'IMPROVEMENTS', 'FORTS', 'BUILDINGS', 'SPECS', 'MILESTONES', 'LANDMARKS', 'RUIN_TYPES', 'WONDERS', 'REWARDS',
   'DIFFICULTY', 'MAP_TYPES', 'MAP_SIZES', 'TRIBES', 'MEMORY_KINDS', 'RELATIONS', 'PROPOSAL_TYPES', 'SPY_MISSIONS', 'EVENTS',
-  'AI_STRATEGIES', 'SCENARIOS', 'VICTORIES', 'SCIENCE_PROJECT', 'ACHIEVEMENT', 'NAVAL'];
+  'AI_STRATEGIES', 'SCENARIOS', 'VICTORIES', 'SCIENCE_PROJECT', 'ACHIEVEMENT', 'NAVAL', 'GOVERNMENTS', 'TAXES', 'LOANS', 'PEACE_TERMS'];
 // Campos que são texto (os demais são identificadores, ícones, cores...)
 const TEXT_FIELDS = ['name', 'desc', 'info', 'perk', 'unique', 'text', 'label', 'bonus', 'cost', 'short', 'title'];
 // Nomes próprios que não se traduzem

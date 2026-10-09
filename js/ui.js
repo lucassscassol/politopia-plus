@@ -1232,8 +1232,10 @@
         case 'war': {
           const o = g.players[+d.p];
           const st = g.relState(this.viewer, +d.p);
+          const truce = g.truceUntil ? g.truceUntil(this.viewer, +d.p) : 0;
           const warn = st === 'alliance' ? PP.t('Trair uma aliança custa <b>3 de reputação</b>, a vítima nunca esquece e todas as tribos que conhecem você passam a desconfiar.')
             : st === 'nap' ? PP.t('Romper um pacto de não agressão custa <b>2 de reputação</b> e todas as tribos que conhecem você passam a desconfiar.')
+            : truce ? PP.t('Vocês estão em trégua até o turno {n}. Romper a trégua custa <b>2 de reputação</b> e todas as tribos que conhecem você passam a desconfiar.', { n: truce })
             : PP.t('Quebrar a paz custa 1 de reputação: as outras tribos vão confiar menos em você nas negociações.');
           const allies = g.alliesOf(+d.p).map(a => g.players[a].name);
           this.ask(PP.t('Declarar guerra?'), `<p>${warn}${allies.length ? ' ' + PP.t('Os aliados de {x} ({y}) serão chamados às armas.', { x: esc(o.name), y: esc(allies.join(', ')) }) : ''}</p>`, PP.t('Declarar guerra'), PP.t('Manter a paz')).then(ok => {
@@ -1399,6 +1401,8 @@
         const R = PP.RELATIONS[st] || PP.RELATIONS.war;
         const extra = st === 'nap' && rel.until != null ? ' · ' + PP.t('pacto até o turno {n}', { n: rel.until }) : st !== 'war' ? ' · ' + PP.t('{r} desde o turno {n}', { r: R.name.toLowerCase(), n: rel.since }) : '';
         let actions = '';
+        const vp = g.vassalPair ? g.vassalPair(me.id, o.id) : false; // suserano e vassalo (js/vassals.js)
+        const meVassal = g.isVassal ? g.isVassal(me.id) : false;
         if (o.alive && my) {
           const btn = (m, label, icon, type, cls) => `<button type="button" class="chip-btn ${cls || ''}" data-m="${m}" data-p="${o.id}" ${type ? `data-t="${type}"` : ''}>${icon ? ico(icon) : ''} ${label}</button>`;
           for (const pr of pend) {
@@ -1407,13 +1411,14 @@
           if (st === 'war') actions += btn('propose', PP.t('Propor paz'), 'ui_peace', 'peace');
           else {
             if (st === 'peace') actions += btn('propose', PP.t('Pacto ({n}t)', { n: PP.NAP_TURNS }), 'd_nap', 'nap');
-            if (st !== 'alliance') actions += btn('propose', PP.t('Aliança'), 'd_alliance', 'alliance');
+            if (st !== 'alliance' && !meVassal) actions += btn('propose', PP.t('Aliança'), 'd_alliance', 'alliance');
             actions += btn('trade', PP.t('Comércio'), 'd_trade');
             actions += btn('tribute', PP.t('Tributo'), 'd_tribute');
-            actions += btn('joint', PP.t('Guerra conjunta'), 'd_joint');
-            if (st === 'alliance') actions += btn('leave', PP.t('Sair da aliança'), 'd_break', null, 'danger');
-            actions += btn('war', st === 'alliance' ? PP.t('Trair e atacar') : st === 'nap' ? PP.t('Romper pacto') : PP.t('Declarar guerra'), 'ui_war', null, 'danger');
+            if (!meVassal && !vp) actions += btn('joint', PP.t('Guerra conjunta'), 'd_joint');
+            if (st === 'alliance' && !vp) actions += btn('leave', PP.t('Sair da aliança'), 'd_break', null, 'danger');
+            if (!vp && !meVassal) actions += btn('war', st === 'alliance' ? PP.t('Trair e atacar') : st === 'nap' ? PP.t('Romper pacto') : PP.t('Declarar guerra'), 'ui_war', null, 'danger');
           }
+          if (this.diploActionsExt) actions += this.diploActionsExt(o, st);
         }
         const op = g.opinion(o.id, me.id);
         const ol = g.opinionLabel(op);
@@ -1422,8 +1427,8 @@
         const others = g.players.filter(q => q.alive && q.id !== o.id && q.id !== me.id && me.met[q.id] && o.met[q.id])
           .map(q => { const s2 = g.relState(o.id, q.id); return s2 === 'war' ? '' : `${esc(q.name)}: ${PP.RELATIONS[s2].name.toLowerCase()}`; }).filter(Boolean).join(', ');
         rows += `<div class="row">${crest(o.color, tribeIcon(o.tribe), 'crest-m')}
-          <div class="rt"><div class="rn">${esc(o.name)} ${o.alive ? `<span class="tag ${R.tag}">${R.name}</span>` : `<span class="tag">${PP.t('Eliminada')}</span>`} ${o.alive ? `<span class="tag ${ol.tag}">${ol.name} (${op > 0 ? '+' : ''}${op})</span>` : ''} ${pend.length ? `<span class="tag gold">${PP.t('Proposta')}</span>` : ''}</div>
-          <div class="rs">${PP.t('{s} pontos · {c} cidades · força {p}', { s: g.score(o), c: g.citiesOf(o.id).length, p: power })}${rep}${extra}</div>
+          <div class="rt"><div class="rn">${esc(o.name)} ${o.alive ? (vp && this.diploTagsExt ? '' : `<span class="tag ${R.tag}">${R.name}</span>`) : `<span class="tag">${PP.t('Eliminada')}</span>`}${o.alive && this.diploTagsExt ? this.diploTagsExt(o) : ''} ${o.alive ? `<span class="tag ${ol.tag}">${ol.name} (${op > 0 ? '+' : ''}${op})</span>` : ''} ${pend.length ? `<span class="tag gold">${PP.t('Proposta')}</span>` : ''}</div>
+          <div class="rs">${PP.t('{s} pontos · {c} cidades · força {p}', { s: g.score(o), c: g.citiesOf(o.id).length, p: power })}${rep}${extra}${o.alive && this.diploInfoExt ? this.diploInfoExt(o) : ''}</div>
           ${mem ? `<div class="rs">${PP.t('Lembram: {x}', { x: mem })}</div>` : ''}
           ${others ? `<div class="rs">${PP.t('Tratados: {x}', { x: others })}</div>` : ''}
           ${intel ? `<div class="rs">${PP.t('Relatório de espionagem (T{t}): {s}★ · {c}{sci} · {u} unidades · {k} tecnologias', { t: intel.turn, s: intel.stars, c: intel.science, sci: SCI, u: intel.units, k: intel.techs })}${intel.strategy && PP.AI_STRATEGIES ? ' · ' + PP.t('objetivo: {x}', { x: PP.AI_STRATEGIES[intel.strategy].name }) : ''} <button type="button" class="chip-btn" data-m="intel" data-p="${o.id}">${PP.t('Ver')}</button></div>` : ''}</div>
@@ -1432,7 +1437,7 @@
       if (unknown) rows += `<div class="row"><span class="crest crest-m unknown">${ico('ui_unknown', 'crest-ico')}</span><div class="rt"><div class="rn">${PP.plural(unknown, PP.t('{n} tribo ainda desconhecida', { n: unknown }), PP.t('{n} tribos ainda desconhecidas', { n: unknown }))}</div><div class="rs">${PP.t('Explore o mapa para fazer contato.')}</div></div></div>`;
       const lock = g.opts.diploLockUntil && g.turn < g.opts.diploLockUntil ? ` <b>${PP.t('Guerra total: a paz só é possível a partir do turno {n}.', { n: g.opts.diploLockUntil })}</b>` : '';
       const html = `<div class="modal-h"><h2>${PP.t('Diplomacia')}</h2>${this.closeX()}</div>
-        <div class="modal-b"><p class="note">${PP.t('Todas as tribos começam em guerra. Cada tribo lembra o que você fez: guerras, tratados cumpridos ou rompidos, comércio, ajuda militar e cidades tomadas. Romper um pacto ou trair uma aliança derruba sua reputação com o mundo inteiro. Aliados compartilham visão, pagam 20% menos pelas tecnologias que o outro já tem e podem chamar você para a guerra.')}${me.reputation < 0 ? ` <b>${PP.t('Sua reputação está manchada ({n}).', { n: me.reputation })}</b>` : me.reputation > 0 ? ' ' + PP.t('Sua reputação é boa (+{n}).', { n: me.reputation }) : ''}${lock}</p>
+        <div class="modal-b"><p class="note">${PP.t('Todas as tribos começam em guerra. Cada tribo lembra o que você fez: guerras, tratados cumpridos ou rompidos, comércio, ajuda militar e cidades tomadas. Romper um pacto ou trair uma aliança derruba sua reputação com o mundo inteiro. Aliados compartilham visão, pagam 20% menos pelas tecnologias que o outro já tem e podem chamar você para a guerra.')}${me.reputation < 0 ? ` <b>${PP.t('Sua reputação está manchada ({n}).', { n: me.reputation })}</b>` : me.reputation > 0 ? ' ' + PP.t('Sua reputação é boa (+{n}).', { n: me.reputation }) : ''}${lock}</p>${this.diploNoteExt ? this.diploNoteExt() : ''}
         <div class="list" style="margin-top:10px">${rows}</div></div>`;
       if (refresh) this.replaceModal('diplo', html); else this.openModal('diplo', html, { narrow: false });
     }
@@ -1514,7 +1519,7 @@
           <div class="field"><span class="lbl">${PP.t('Idioma')}</span><div class="seg lang-seg">
             ${Object.keys(PP.LANGS).map(k => `<button type="button" class="${PP.lang === k ? 'on' : ''}" data-m="lang" data-v="${k}" lang="${PP.LANG_LOCALE[k]}">${PP.LANGS[k]}</button>`).join('')}</div></div>
           <p class="note">${PP.t('Partida: mapa {w}×{h} · {type} · IA {diff}', { w: this.game.W, h: this.game.H, type: (PP.MAP_TYPES[o.mapType] || { name: o.mapType }).name, diff: PP.DIFFICULTY[o.difficulty].name })}${o.scenario && o.scenario !== 'normal' ? ' · ' + PP.t('Cenário {x}', { x: PP.SCENARIOS[o.scenario].name }) : ''}. ${PP.t('O jogo salva sozinho a cada turno.')}</p>
-          <p class="note">${PP.t('Atalhos: Enter encerra o turno · N próxima unidade · T tecnologia · D diplomacia · C cidades · O objetivos · roda do mouse ou pinça para zoom.')}</p>
+          <p class="note">${PP.t('Atalhos: Enter encerra o turno · N próxima unidade · T tecnologia · D diplomacia · C cidades · R reino · O objetivos · roda do mouse ou pinça para zoom.')}</p>
         </div>
         <div class="modal-f"><button type="button" class="btn ghost" data-m="objectives">${PP.t('Objetivos')}</button><button type="button" class="btn ghost" data-m="achievements">${PP.t('Conquistas')}</button><button type="button" class="btn ghost" data-m="replay">${PP.t('Replay')}</button>
           <button type="button" class="btn ghost" data-m="help">${PP.t('Como jogar')}</button><button type="button" class="btn ghost" data-m="quit">${PP.t('Sair para o menu')}</button><button type="button" class="btn primary" data-m="resume">${PP.t('Voltar ao jogo')}</button></div>`;
@@ -1570,7 +1575,7 @@
       this.openModal('help', `<div class="modal-h"><h2>${PP.t('Como jogar')}</h2>${this.closeX()}</div>
         <div class="modal-b help">
           ${h('Objetivo')}
-          ${p('No modo <b>Dominação</b>, vença eliminando todas as outras tribos (uma tribo é eliminada ao perder todas as cidades). No modo <b>Pontos</b>, tenha a maior pontuação ao fim do turno limite.')}
+          ${p('No modo <b>Dominação</b>, vença eliminando todas as outras tribos (uma tribo é eliminada ao perder todas as cidades) ou mantendo todas como suas vassalas por 5 turnos. No modo <b>Pontos</b>, tenha a maior pontuação ao fim do turno limite.')}
           ${p('Em partidas novas também valem (se ativadas na criação): <b>Científica</b> (com a árvore de tecnologias completa, o Grande Observatório em 3 etapas de 150, 250 e 350{sci} — mais em mapas grandes —, uma a cada 3 turnos, numa cidade científica de nível 5 ou mais), <b>Econômica</b> (estrelas acumuladas em rotas comerciais e ao menos uma rota com outra tribo), <b>Maravilhas</b> (6 das 8 maravilhas mantidas por 8 turnos; quem conquista a cidade leva a maravilha, e cada maravilha que você já tem encarece a próxima em 10★), <b>Territorial</b> (a maior parte das terras por 8 turnos: 63% com 2 tribos, até 45% com 5 ou mais) e <b>Diplomática</b> (alianças com metade das tribos, nenhuma guerra e reputação positiva por 5 turnos). O botão <b>Objetivos</b> mostra o progresso de todos.')}
           ${h('Duas moedas')}
           ${p('<b>★ Estrelas</b> vêm do nível das cidades, oficinas, parques, bancos, garimpos, plantações, mercados e rotas comerciais. Pagam unidades, melhorias, construções e maravilhas.')}
@@ -1620,6 +1625,13 @@
           ${h('Era V e personagens')}
           ${p('A Era V (Impérios) traz Burocracia, Diplomacia Real, Arte da Guerra, Siderurgia e Imprensa, com Chancelaria, Paço Regional, Embaixada, Academia Militar, Fundição Real, Casa da Imprensa, o Dragão (atirador montado) e o Morteiro.')}
           ${p('<b>Personagens</b> têm nome próprio e só pode haver um de cada por reino (marcados com uma estrela dourada): o <b>General</b> dá +20% de ataque e +10% de defesa às tropas vizinhas; o <b>Governador</b>, dentro ou ao lado de uma cidade sua, faz dela um centro administrativo (+2★, +10 de lealdade, +1 de capacidade); o <b>Embaixador</b>, no território de uma tribo em paz com você, rende +2 de opinião por turno e um relatório dela. Personagens não ocupam vaga nas cidades e não podem ser convertidos.')}
+          ${h('Governo e tesouro')}
+          ${p('Na tela <b>Reino</b> você escolhe a <b>forma de governo</b>: Chefia Tribal (a inicial, sem efeitos), Monarquia, Teocracia, Feudalismo, República e, para quem já tem muitas cidades e uma capital estrangeira ou dois vassalos, o <b>Império</b>. Cada governo tem bônus e custos; trocar causa <b>anarquia</b> por 2 turnos (1 para proclamar o Império): metade das estrelas e da ciência das cidades, sem os efeitos do governo. Depois de uma troca, a próxima só vem 10 turnos depois.')}
+          ${p('Os <b>impostos</b> são o orçamento do reino: baixos (−20% de estrelas e +10% de ciência, +10 de lealdade e as cidades crescem), normais, altos (+20% de estrelas, −25% de ciência, −10 de lealdade) ou extorsivos (+40% de estrelas, −50% de ciência, −20 de lealdade e −1 de capacidade administrativa). A lealdade pesa nas cidades conquistadas.')}
+          ${p('Com Comércio você pode pedir <b>empréstimos</b> (até 6 vezes a sua renda em estrelas) e devolver com juros em parcelas cobradas no começo de cada turno; um Banco baixa os juros. Quem atrasa três parcelas seguidas dá <b>calote</b>: a dívida some, mas a reputação cai 2, o governo entra em anarquia e o crédito fica suspenso por 20 turnos.')}
+          ${h('Termos de paz e vassalos')}
+          ${p('Cada guerra tem um <b>placar</b>: tropas derrotadas, cidades tomadas (capitais valem o dobro) e saques. Quem está ganhando pode <b>exigir termos</b> para assinar a paz: <b>reparações</b> (estrelas por turno durante 8 turnos), a <b>cessão de uma cidade</b> (nunca a capital nem a última) ou a <b>vassalagem</b>. Toda paz abre uma <b>trégua</b> de 10 turnos; rompê-la custa 2 de reputação, como romper um pacto.')}
+          ${p('<b>Vassalos</b> ficam aliados do suserano (visão compartilhada), pagam 15% da renda em estrelas como tributo (25% no Feudalismo, 20% no Império), entram nas guerras do suserano, não declaram guerra nem fazem alianças sozinhos e não negociam a paz de uma guerra do suserano. Uma tribo fraca e amiga pode aceitar sua <b>proteção</b> em tempos de paz. O suserano pode libertar o vassalo ou, depois de 10 turnos e com boa relação, propor a <b>anexação</b> (8★ por cidade): as cidades, tropas e o tesouro do vassalo passam para ele. O vassalo pode <b>declarar independência</b> a qualquer momento, o que vira guerra.')}
           ${h('Maravilhas')}
           ${p('Cada maravilha só pode ser construída uma vez no mundo, numa casa vazia do seu território. Todas dão +3 de população à cidade e 500 pontos, além do efeito próprio.')}
           ${h('Tribos')}<ul>${tribes}</ul>

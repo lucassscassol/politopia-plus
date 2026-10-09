@@ -529,3 +529,15 @@ select {
 @media (max-width: 380px) {
   .side-btn small { font-size: 0.44rem; letter-spacing: 0; }
 }
+
+/* ------------------------------------------------------------------ Reino: governo, tesouro e vassalos */
+.row.tight { padding: 6px 10px; }
+.row.tight .rt { min-width: 120px; }
+.row.tight .rn { font-family: var(--font-body); font-weight: 500; font-size: 0.9rem; letter-spacing: 0; }
+.row.total { border-color: var(--line-2); }
+.row.total .rn { font-family: var(--font-display); font-weight: 700; }
+.ra.nums { gap: 10px; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.ra.nums .star { color: var(--gold-hi); }
+.tribe-chip.anarchy { border-color: var(--bad); box-shadow: inset 0 0 0 1px rgba(201, 86, 63, 0.35); }
+.tribe-chip .gov-mark { display: inline-flex; color: var(--gold-hi); }
+.tribe-chip .gov-mark .ico { width: 16px; height: 16px; }

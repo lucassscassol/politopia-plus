@@ -1,6 +1,6 @@
 # Chamas de Vardren
 
-Jogo de estratégia por turnos para navegador e celular, com várias camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, cidades especializadas, organização dos reinos, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, cinco eras com personagens, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo. Em português, inglês e espanhol.
+Jogo de estratégia por turnos para navegador e celular, com várias camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, vassalos e termos de paz, formas de governo, impostos e empréstimos, cidades especializadas, organização dos reinos, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, cinco eras com personagens, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo. Em português, inglês e espanhol.
 
 Roda direto no navegador, sem build e sem dependências: HTML, CSS e JavaScript puro, com o mapa desenhado em Canvas isométrico.
 
@@ -12,9 +12,9 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
-- **Android:** baixe e instale [`apk/ChamasDeVardren-2.2.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.2.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
+- **Android:** baixe e instale [`apk/ChamasDeVardren-2.3.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.3.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
-Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `O` objetivos, `Esc` fecha janelas.
+Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `R` reino, `O` objetivos, `Esc` fecha janelas.
 
 A partida é salva automaticamente no aparelho a cada turno. Saves, opções e conquistas gravados com o nome antigo do jogo (Politopia+) são copiados para o nome novo na primeira abertura. Saves da versão anterior continuam abrindo (são convertidos na hora e mantêm as regras de vitória com que foram criados).
 
@@ -83,6 +83,29 @@ Todo o som é sintetizado pelo próprio jogo (`js/audio.js`), sem arquivos de á
 - **Música:** composta enquanto toca, em ré menor: bordão grave, alaúde em arpejos e melodias e tambor de moldura. Muda de progressão e textura a cada 4 compassos e fica mais marcada (tambor em pulso) enquanto houver combate envolvendo você.
 - **Opções:** liga/desliga de efeitos e música no menu principal; no Menu da partida, volume Desligado, Baixo, Médio ou Alto para cada um (guardado no aparelho). O som começa no primeiro toque (regra dos navegadores) e para quando o app ou a aba vai para o fundo; no Android, os botões de volume controlam o som do jogo.
 
+## Expansão 2.3: coroa e tesouro
+
+Mecânicas inspiradas em *Age of History* (formas de governo, impostos, empréstimos, vassalos, termos de paz cobrados pelo placar da guerra e trégua), adaptadas ao tabuleiro e aos turnos curtos daqui. A anarquia na troca de governo é uma adaptação nossa, para que a escolha tenha custo. Tudo fica na nova tela **Reino** (botão na barra lateral ou tecla `R`) e na tela de Diplomacia.
+
+| Sistema | Como funciona |
+| --- | --- |
+| **Formas de governo** | **Chefia Tribal** (a inicial, sem efeitos). **Monarquia** (Organização): +1 de capacidade administrativa, +5 de lealdade, +2★ na capital, −10% de ciência. **Teocracia** (Meditação): +10 de lealdade, cada Templo rende +1★, Missionários 2★ mais baratos, −15% de ciência. **Feudalismo** (Estratégia): muralhas e fortificações pela metade do preço, tropas fortificadas +15% de defesa, vassalos pagam 25% de tributo, −10% de estrelas. **República** (Comércio): +10% de ciência e +1★ por rota comercial ativa, mas com cansaço de guerra (−20% de estrelas e −5 de lealdade enquanto houver guerra ativa). **Império** (Burocracia, 6 cidades, ou 8 nos mapas maiores que 18×18, e uma capital estrangeira ou dois vassalos): +2 de capacidade, +10% de estrelas, cidades conquistadas ficam ocupadas só 2 turnos, vassalos pagam 20%. |
+| **Anarquia** | Trocar de governo custa 2 turnos de anarquia (1 para proclamar o Império): metade das estrelas e da ciência das cidades, −10 de lealdade e nenhum efeito de governo. Depois de uma troca, a próxima só em 10 turnos. |
+| **Impostos** | São o orçamento do reino e mudam quando você quiser, no seu turno: **baixos** (−20% de estrelas, +10% de ciência, +10 de lealdade e +1 de população por cidade a cada 6 turnos), **normais**, **altos** (+20% de estrelas, −25% de ciência, −10 de lealdade) e **extorsivos** (+40% de estrelas, −50% de ciência, −20 de lealdade e −1 de capacidade). |
+| **Empréstimos** | Com Comércio: **pequeno** (3× a renda, de 10 a 60★, 20% de juros em 6 parcelas) ou **grande** (6× a renda, de 20 a 120★, 35% em 10 parcelas); um Banco tira 10 pontos dos juros. As parcelas são cobradas no começo do turno e dá para quitar antes. Parcela atrasada acrescenta 10% do que faltou; três atrasos seguidos são **calote**: a dívida some, mas a reputação cai 2, o governo entra em anarquia e o crédito fica suspenso por 20 turnos. |
+| **Placar da guerra** | Cada guerra soma pontos para cada lado: tropa derrotada 1, personagem 3, cidade tomada 4, capital 8, saque 1. A Diplomacia mostra o placar. |
+| **Termos de paz** | Quem está ganhando pode exigir, em troca da paz: **reparações** (1 a 6★ por turno durante 8 turnos), a **cessão de uma cidade** (nunca a capital nem a última) ou a **vassalagem**. A tela de termos avisa se a proposta é provável ou improvável. A IA também exige termos quando ganha. |
+| **Trégua** | Toda paz abre 10 turnos de trégua; rompê-la custa 2 de reputação, como romper um pacto, e a IA quase nunca rompe. |
+| **Vassalos** | Ficam aliados do suserano (visão compartilhada), pagam 15% da renda em estrelas como tributo, entram nas guerras dele e não declaram guerra, nem fazem alianças, nem negociam a paz de uma guerra do suserano sozinhos. Uma tribo fraca e amiga pode aceitar a sua **proteção** em tempos de paz. |
+| **Anexação e independência** | Depois de 10 turnos de vassalagem e com boa relação, o suserano pode propor a **anexação** (8★ por cidade): cidades, tropas e o tesouro do vassalo passam para ele. Ele também pode **libertar** o vassalo, que fica grato. O vassalo pode **declarar independência** a qualquer momento: vira guerra, e os aliados do suserano são chamados. |
+| **Dominação por vassalos** | Quem mantém todos os rivais vivos como seus vassalos por 5 turnos vence por Dominação. Vassalos não vencem pela Diplomacia, e cada vassalo vale +100 pontos. |
+| **IA** | Escolhe o governo pela situação e pela estratégia (República para a ciência e o comércio, Feudalismo para a defesa, Monarquia quando o reino passa da capacidade, Império assim que puder) e não troca sob cerco; revê os impostos a cada 3 turnos; pede empréstimo só na emergência e quita quando sobra; exige termos quando ganha (o conquistador segue a guerra, a não ser para fazer um vassalo); oferece proteção a tribos fracas; anexa vassalos leais; e os vassalos se rebelam quando ficam fortes ou ressentidos. |
+| **Conquistas** | Coroação, Reformador, Suserano e Anexação Pacífica (29 no total). |
+
+Partidas antigas começam com Chefia Tribal, impostos normais e sem vassalos, o que não muda nada nelas.
+
+## Regras de referência
+
 ### Tribos
 
 | Tribo | Começa com | Vantagem | Mecânica única (2.0) |
@@ -135,13 +158,17 @@ js/achievements.js    conquistas
 js/replay.js          quadros do replay
 js/scenarios.js       cenários
 js/realm.js           organização do reino (capacidade, alcance da corte), construções da Era V e personagens
+js/government.js      formas de governo, anarquia, impostos e empréstimos
+js/vassals.js         placar da guerra, termos de paz, trégua, vassalos, anexação e dominação por vassalos
 js/ai-strategy.js     objetivos da IA, análise, propostas e iniciativas diplomáticas
 js/ai.js              IA tática: pesquisa, economia, unidades, cerco, navegação (com pontos de extensão AI.ext)
 js/ai-realm.js        IA da organização do reino, da Era V e dos personagens
+js/ai-crown.js        IA do governo, dos impostos, dos empréstimos, dos termos de paz e dos vassalos
 js/render.js          renderizador isométrico em Canvas com animações
 js/ui.js              entrada, painéis, modais, fluxo de turnos, passa-e-joga
 js/ui-screens.js      telas dos sistemas novos (objetivos, comércio, espionagem, replay, conquistas...)
 js/ui-realm.js        administração e personagens na cidade, resumo do reino e avisos
+js/ui-crown.js        tela Reino (governo, impostos, tesouro, empréstimos, vassalos), termos de paz e ações na Diplomacia
 js/audio.js           som: síntese dos efeitos, música generativa e motor Web Audio (a síntese roda no Node)
 js/ui-audio.js        som na interface: eventos da partida → efeitos, cliques, opções de volume
 js/main.js            inicialização
@@ -150,7 +177,7 @@ android/              app Android: manifesto, MainActivity (WebView), ícones, f
 tools/build-apk.sh    gera o APK sem Gradle (ferramentas Android do Ubuntu)
 tools/android-icons.js  gera os ícones do app a partir de assets/icon.svg (Playwright)
 tests/load.js         carrega o motor no Node na mesma ordem do index.html
-tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, saves antigos...)
+tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, governo, empréstimos, vassalos, saves antigos...)
 tests/sim.js          partidas IA × IA com checagens de integridade e salvar/carregar
 tests/balance.js      simulações de balanceamento com todas as vitórias e cenários
 tests/i18n.js         cobertura dos idiomas e partida idêntica em qualquer idioma
@@ -192,7 +219,7 @@ node tests/systems.js       # só os testes de sistemas (ONLY=texto filtra pelo 
 node tests/sim.js 20 80
 ```
 
-O simulador verifica a cada turno a consistência do tabuleiro (grade de unidades, cidades, recursos negativos, cargas de transporte, rotas, fortificações, lealdade) e testa que salvar e carregar reproduz o mesmo estado. Os testes de sistemas incluem saves da versão 1, cenários, validação de mapas e determinismo (uma partida recarregada continua idêntica).
+O simulador verifica a cada turno a consistência do tabuleiro (grade de unidades, cidades, recursos negativos, cargas de transporte, rotas, fortificações, lealdade, governos, impostos e empréstimos válidos, vassalos só de tribos vivas e sempre aliados, nenhuma tribo viva sem cidades) e testa que salvar e carregar reproduz o mesmo estado. Os testes de sistemas incluem saves da versão 1, cenários, validação de mapas e determinismo (uma partida recarregada continua idêntica).
 
 ## Créditos
 

@@ -1,6 +1,6 @@
 {
   "name": "chamas-de-vardren",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "Chamas de Vardren: jogo de estratégia por turnos em HTML/JS puro.",
   "scripts": {
