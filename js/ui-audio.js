@@ -11,7 +11,7 @@
   const SIEGE = { catapult: 1, cannon: 1, mortar: 1 };
   const GUNS = { cannon: 1, mortar: 1, frigate: 1, ironclad: 1 };
   const SHOTS = { musketeer: 1, dragoon: 1 };
-  const ABILITY_SFX = { charge: 'horn', aim: 'creak', bombard: 'creak', taunt: 'clank', phalanx: 'clank', bless: 'heal', recon: 'horn', broadside: 'cannon' };
+  const ABILITY_SFX = { charge: 'horn', aim: 'creak', bombard: 'creak', taunt: 'clank', phalanx: 'clank', bless: 'heal', recon: 'horn', broadside: 'cannon', preach: 'convert' };
 
   const proto = PP.UI.prototype;
 
@@ -215,6 +215,32 @@
           break;
         case 'cession':
           if (d.to === v || d.from === v) this.soundAt(d.to === v ? 'capture' : 'lost', d.city.x, d.city.y);
+          break;
+        // 2.4: crescimento, projetos, manutenção, cerco, rebeldes e coalizão
+        case 'citydev':
+          if (d.player !== v) break;
+          if (d.type === 'invest') this.soundAt('pop', d.city.x, d.city.y);
+          else if (d.type === 'project') this.soundAt('seal', d.city.x, d.city.y);
+          else if (d.type === 'projectDone') this.soundAt(d.project === 'drills' ? 'clank' : d.project === 'patronage' ? 'tech' : 'levelup', d.city.x, d.city.y);
+          else if (d.type === 'demolish') this.soundAt('crash', d.city.x, d.city.y);
+          else if (d.type === 'perk') this.soundAt('tech');
+          break;
+        case 'upkeep':
+          if (d.player === v) this.soundAt(d.type === 'desertion' ? 'lost' : 'error');
+          break;
+        case 'siege':
+          if (d.player === v || (d.by && d.by.indexOf(v) >= 0)) this.soundAt(d.type === 'start' ? 'war' : 'peace', d.city.x, d.city.y);
+          break;
+        case 'camp':
+          if (d.type === 'cleared' && d.player === v) this.soundAt('capture', d.camp.x, d.camp.y, { gain: 0.8 });
+          else if (d.type === 'raid' && d.victim === v) this.soundAt('pillage', d.tile.x, d.tile.y);
+          else if (d.type === 'hit' && d.unit.owner === v) this.soundAt('hit', d.unit.x, d.unit.y);
+          break;
+        case 'rebels':
+          if (d.player === v || d.founder === v) this.soundAt('war', d.city.x, d.city.y);
+          break;
+        case 'coalition':
+          if (d.type === 'formed') this.soundAt('gong', null, null, { gain: 0.7 });
           break;
       }
     },

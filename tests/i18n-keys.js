@@ -38,6 +38,9 @@ function collect() {
     // rótulos das estatísticas finais
     const sl = /PP\.STAT_LABELS = \[([\s\S]*?)\];/.exec(src);
     if (sl) { const r2 = new RegExp("\\['\\w+', " + STR + '\\]', 'g'); let q; while ((q = r2.exec(sl[1]))) put(unesc(q[1]), f); }
+    // rótulos acrescentados por outros módulos: PP.STAT_LABELS.push(['chave', 'Rótulo'], ...)
+    const sp = /PP\.STAT_LABELS\.push\(([\s\S]*?)\);/.exec(src);
+    if (sp) { const r2 = new RegExp("\\['\\w+', " + STR + '\\]', 'g'); let q; while ((q = r2.exec(sp[1]))) put(unesc(q[1]), f); }
   }
   // textos fixos do index.html
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

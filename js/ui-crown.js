@@ -51,7 +51,8 @@
         const V = g.players[vid];
         out.push({ label: PP.t('Tributo de {x} (estimado)', { x: V.name }), stars: Math.floor(Math.max(0, g.income(V).stars) * g.tributeRate(p.id)), sci: 0 });
       }
-      const income = inc.lines.map(lineRow).join('') + `<div class="row tight total"><div class="rt"><div class="rn">${PP.t('Renda por turno')}</div></div><div class="ra nums"><span class="star">${signed(inc.stars)}★</span> <span class="sci">${signed(inc.sci)}${SCI}</span></div></div>`;
+      const income = inc.lines.map(lineRow).join('') + `<div class="row tight total"><div class="rt"><div class="rn">${PP.t('Renda por turno')}</div></div><div class="ra nums"><span class="star">${signed(inc.stars)}★</span> <span class="sci">${signed(inc.sci)}${SCI}</span></div></div>` +
+        (this.armyRow ? this.armyRow(p, inc) : ''); // manutenção do exército (js/ui-development.js)
       // --- empréstimos
       let loans;
       if (p.loan) {

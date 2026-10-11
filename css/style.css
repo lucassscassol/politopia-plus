@@ -541,3 +541,8 @@ select {
 .tribe-chip.anarchy { border-color: var(--bad); box-shadow: inset 0 0 0 1px rgba(201, 86, 63, 0.35); }
 .tribe-chip .gov-mark { display: inline-flex; color: var(--gold-hi); }
 .tribe-chip .gov-mark .ico { width: 16px; height: 16px; }
+
+/* 2.4: crescimento, projetos e manutenção */
+.row .row-ico { width: 34px; height: 34px; flex: none; border-radius: var(--r); display: grid; place-items: center; background: var(--surface-3); border: 1px solid var(--line-2); color: var(--gold-hi); }
+.row .row-ico .ico { width: 20px; height: 20px; }
+.res small.neg { color: #e07a62; font-weight: 700; }

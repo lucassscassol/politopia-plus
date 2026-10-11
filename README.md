@@ -1,6 +1,6 @@
 # Chamas de Vardren
 
-Jogo de estratégia por turnos para navegador e celular, com várias camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, vassalos e termos de paz, formas de governo, impostos e empréstimos, cidades especializadas, organização dos reinos, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, cinco eras com personagens, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo. Em português, inglês e espanhol.
+Jogo de estratégia por turnos para navegador e celular, com várias camadas de estratégia: ciência separada do dinheiro, recursos estratégicos, promoções, diplomacia com memória, vassalos e termos de paz, formas de governo, impostos e empréstimos, manutenção do exército, cidades especializadas que crescem com investimento e projetos, cerco, rebeldes, organização dos reinos, rotas comerciais de verdade, logística, combate tático, navios, espionagem, eventos mundiais, cinco eras com personagens, seis tipos de vitória, cenários, conquistas, replay e uma IA com objetivos de longo prazo. Em português, inglês e espanhol.
 
 Roda direto no navegador, sem build e sem dependências: HTML, CSS e JavaScript puro, com o mapa desenhado em Canvas isométrico.
 
@@ -12,7 +12,7 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
-- **Android:** baixe e instale [`apk/ChamasDeVardren-2.3.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.3.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
+- **Android:** baixe e instale [`apk/ChamasDeVardren-2.4.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.4.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `R` reino, `O` objetivos, `Esc` fecha janelas.
 
@@ -104,6 +104,27 @@ Mecânicas inspiradas em *Age of History* (formas de governo, impostos, emprést
 
 Partidas antigas começam com Chefia Tribal, impostos normais e sem vassalos, o que não muda nada nelas.
 
+## Expansão 2.4: cidades e campanhas
+
+Uma análise de partidas IA × IA mostrou o problema do meio para o fim da partida: no turno 40 cada tribo tinha em média ~580★ paradas (sem onde gastar), a árvore de tecnologias acabava no turno ~38, as cidades paravam no nível 5 a 7 (a Metrópole saiu 1 vez em 459 cidades), todas terminavam com as mesmas construções e, no modo clássico, 7 de 8 partidas chegavam ao turno 90 sem vencedor. Esta expansão ataca esses pontos.
+
+| Sistema | Como funciona |
+| --- | --- |
+| **Manutenção do exército** | Cada tropa custa estrelas por turno conforme o preço: 0,5★ (até 3★), 1★ (até 6★), 1,5★ (até 10★) e 2★ acima disso; Gigantes não custam. Cada cidade sustenta 1 tropa de graça (a capital, 2), +1 com Quartel, +1 com Caserna e +2 se for militar (as mais baratas ocupam essas vagas primeiro). Tropas terrestres fora do abastecimento custam 50% a mais; o Feudalismo corta a conta em 25%; frações de estrela são perdoadas. A renda líquida pode ficar negativa: o tesouro paga a diferença e, quando acaba, uma tropa deserta por turno. A conta aparece no Tesouro (tela Reino) e no custo de cada unidade. |
+| **Investir em crescimento** | Na tela da cidade: +1 de população por 2★ + 2★ por nível, uma vez por turno em cada cidade (não durante ocupação ou cerco). Torna alcançáveis os níveis 8 a 12, os marcos altos das especializações e a Metrópole. |
+| **Projetos de cidade** | Um de cada vez, por 3 turnos: **Festival** (4★ + 1★ por nível: +15 de lealdade enquanto dura e +1 de população no fim), **Mecenato** (4★ por nível: +1⚗ por nível em cada turno) e **Exercícios militares** (5★ + 1★ por nível: +1 de XP por turno às tropas terrestres na cidade e ao lado). |
+| **Construções de segundo nível** | Biblioteca Ampliada (Educação, +2⚗), Casa da Moeda (Burocracia, +3★), Armazéns (Construção, +2 de população), Catedral (Filosofia, +1 de população, +10 de lealdade, +100 pontos, cura +2) e Caserna (Arquitetura, +2 de capacidade e +1 tropa sustentada). Exigem a construção de primeiro nível e não ocupam vaga. |
+| **Vagas de construção** | O nível limita quantas construções a cidade tem: 2 no nível 1, 3 no nível 3 e +1 a cada 2 níveis; +1 na capital e +1 na Metrópole. Muralhas, Chancelaria, Paço Regional, Embaixada e as de segundo nível não ocupam vaga. Tocar numa construção pronta oferece demoli-la (sem reembolso; reconstruir não dá a população de novo). Cada cidade deixa de ter tudo e a especialização vira identidade. |
+| **Avanços do futuro** | Depois da árvore inteira, cada Tecnologia do Futuro (ainda +120 pontos) traz um avanço à escolha: Comércio Global (+5% de estrelas, até 4×), Método Científico (+5% de ciência, até 4×), Logística Moderna (−10% de manutenção, até 3×), Urbanismo (investir custa −15%, até 3×), Administração Moderna (+1 de capacidade, até 3×) e Táticas Modernas (+10% de ataque, até 2×). |
+| **Cerco** | Uma cidade com 2 ou mais tropas inimigas ao lado, e mais inimigos do que defensores em volta, fica sitiada: produz metade, não recebe investimento nem projetos novos e a defesa cai 10% por turno de cerco (até −40%); do 2º turno em diante a guarnição perde 2 de vida por turno (nunca abaixo de 1) e do 3º em diante a cidade perde população. O mapa marca a cidade sitiada. |
+| **Rebeldes** | Cidades conquistadas em resistência fazem surgir guerrilheiros da tribo fundadora quando ela está viva e em guerra com o dono. Sem fundador para lutar, os rebeldes erguem um acampamento; acampamentos também surgem em terras sem dono com o tempo. Cada um saqueia uma melhoria ou fere uma tropa vizinha a cada 3 turnos, cresce até a força 3 e tira 10 de lealdade e 1★ (até 2★) das cidades a até 2 casas. Uma tropa que entra no acampamento o destrói: sofre 2 + 2 por força de dano (nunca morre por isso) e recolhe 4★ + 3★ por força. |
+| **Coalizão** | Do turno 30 em diante, com 3 tribos ou mais, quem passa a ter 60% mais pontos que a segunda vira alvo de uma coalizão: as outras desconfiam dela, se aliam e entram em guerra juntas, até a vantagem cair abaixo de 30%. |
+| **Mecânicas revividas** | O Missionário ganhou **Pregar** (+20 de lealdade numa cidade sua, −15 numa inimiga vizinha ou mais opinião de quem está em paz); a cidade Portuária rende até +5★ pelas casas marítimas (antes, até +3★) e a IA a escolhe mais; a IA mantém um espião para vigiar os vizinhos. |
+| **IA** | Recruta dentro de um orçamento de manutenção (maior em guerra e sob ameaça) e dispensa as tropas mais fracas e longe do inimigo quando a conta estoura; usa as vagas nas construções mais valiosas para cada cidade e troca as inúteis; investe em crescimento e faz projetos com o dinheiro que sobra; escolhe avanços conforme o objetivo; caça acampamentos rebeldes; leva Missionários às cidades que resistem; e se une contra o líder quando há coalizão. |
+| **Conquistas** | Mecenas, Urbanista, Visionário, Sitiador e Caçador de Rebeldes (34 no total). |
+
+A manutenção, as vagas e os rebeldes podem ser desligados na criação da partida. Partidas antigas continuam sem manutenção, vagas, cerco e rebeldes, mas ganham o investimento, os projetos, as construções de segundo nível, os avanços do futuro, a coalizão e o Pregar.
+
 ## Regras de referência
 
 ### Tribos
@@ -160,15 +181,19 @@ js/scenarios.js       cenários
 js/realm.js           organização do reino (capacidade, alcance da corte), construções da Era V e personagens
 js/government.js      formas de governo, anarquia, impostos e empréstimos
 js/vassals.js         placar da guerra, termos de paz, trégua, vassalos, anexação e dominação por vassalos
+js/development.js     manutenção do exército, investimento, projetos de cidade, construções de segundo nível, vagas e avanços do futuro
+js/warfare.js         cerco, rebeldes (guerrilheiros e acampamentos), coalizão contra o líder e o Pregar do Missionário
 js/ai-strategy.js     objetivos da IA, análise, propostas e iniciativas diplomáticas
 js/ai.js              IA tática: pesquisa, economia, unidades, cerco, navegação (com pontos de extensão AI.ext)
 js/ai-realm.js        IA da organização do reino, da Era V e dos personagens
 js/ai-crown.js        IA do governo, dos impostos, dos empréstimos, dos termos de paz e dos vassalos
+js/ai-development.js  IA da manutenção, das vagas, do investimento, dos projetos, dos avanços, dos acampamentos e da coalizão
 js/render.js          renderizador isométrico em Canvas com animações
 js/ui.js              entrada, painéis, modais, fluxo de turnos, passa-e-joga
 js/ui-screens.js      telas dos sistemas novos (objetivos, comércio, espionagem, replay, conquistas...)
 js/ui-realm.js        administração e personagens na cidade, resumo do reino e avisos
 js/ui-crown.js        tela Reino (governo, impostos, tesouro, empréstimos, vassalos), termos de paz e ações na Diplomacia
+js/ui-development.js  crescimento, projetos e vagas na cidade, conta do exército, avanços do futuro, cerco e acampamentos no mapa
 js/audio.js           som: síntese dos efeitos, música generativa e motor Web Audio (a síntese roda no Node)
 js/ui-audio.js        som na interface: eventos da partida → efeitos, cliques, opções de volume
 js/main.js            inicialização
@@ -177,7 +202,7 @@ android/              app Android: manifesto, MainActivity (WebView), ícones, f
 tools/build-apk.sh    gera o APK sem Gradle (ferramentas Android do Ubuntu)
 tools/android-icons.js  gera os ícones do app a partir de assets/icon.svg (Playwright)
 tests/load.js         carrega o motor no Node na mesma ordem do index.html
-tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, governo, empréstimos, vassalos, saves antigos...)
+tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, governo, empréstimos, vassalos, manutenção, vagas, cerco, rebeldes, saves antigos...)
 tests/sim.js          partidas IA × IA com checagens de integridade e salvar/carregar
 tests/balance.js      simulações de balanceamento com todas as vitórias e cenários
 tests/i18n.js         cobertura dos idiomas e partida idêntica em qualquer idioma
@@ -219,7 +244,7 @@ node tests/systems.js       # só os testes de sistemas (ONLY=texto filtra pelo 
 node tests/sim.js 20 80
 ```
 
-O simulador verifica a cada turno a consistência do tabuleiro (grade de unidades, cidades, recursos negativos, cargas de transporte, rotas, fortificações, lealdade, governos, impostos e empréstimos válidos, vassalos só de tribos vivas e sempre aliados, nenhuma tribo viva sem cidades) e testa que salvar e carregar reproduz o mesmo estado. Os testes de sistemas incluem saves da versão 1, cenários, validação de mapas e determinismo (uma partida recarregada continua idêntica).
+O simulador verifica a cada turno a consistência do tabuleiro (grade de unidades, cidades, recursos negativos, cargas de transporte, rotas, fortificações, lealdade, governos, impostos e empréstimos válidos, vassalos só de tribos vivas e sempre aliados, nenhuma tribo viva sem cidades, projetos, avanços e acampamentos válidos) e testa que salvar e carregar reproduz o mesmo estado. Os testes de sistemas incluem saves da versão 1, cenários, validação de mapas e determinismo (uma partida recarregada continua idêntica).
 
 ## Créditos
 

@@ -348,7 +348,7 @@
     if (g.isCoastal(c)) {
       let sea = 0;
       for (const t of g.tiles) if (t.cityId === c.id && (t.res === 'fish' || t.res === 'whale' || t.imp === 'port')) sea++;
-      w.porto = 0.6 + sea * 0.35;
+      w.porto = 1 + sea * 0.5; // a Portuária rende até +5★ pelas casas marítimas (js/development.js)
     }
     let crops = 0, enemyNear = 0;
     for (const t of g.tiles) if (t.cityId === c.id && (t.res === 'crop' || t.imp === 'farm' || t.res === 'fruit')) crops++;

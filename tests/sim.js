@@ -81,6 +81,25 @@ function validate(g) {
     if (g.relState(p.id, o.id) !== 'alliance') throw new Error('vassalo fora da aliança ' + p.name);
     for (const r of p.reparations || []) if (!g.players[r.to].alive) throw new Error('reparação para tribo morta ' + p.name);
   }
+  // desenvolvimento (2.4): projetos, avanços, vagas e acampamentos
+  for (const c of g.cities) {
+    if (c.cproj && (!PP.CITY_PROJECTS[c.cproj.id] || !(c.cproj.left > 0))) throw new Error('projeto inválido ' + c.name);
+    if (!(c.siege >= 0)) throw new Error('cerco inválido ' + c.name);
+    for (const id in c.buildings) if (!PP.BUILDINGS[id]) throw new Error('construção desconhecida ' + id);
+    for (const id in c.buildings) { const b = PP.BUILDINGS[id]; if (b.needs && !c.buildings[b.needs] && b.upgradeOf) throw new Error('segundo nível sem o primeiro ' + c.name); }
+  }
+  for (const p of g.players) {
+    for (const id in p.futurePerks || {}) if (!PP.FUTURE_PERKS[id] || p.futurePerks[id] > PP.FUTURE_PERKS[id].max) throw new Error('avanço inválido ' + p.name);
+  }
+  const campSeen = new Set();
+  for (const k of g.camps || []) {
+    const t = g.tile(k.x, k.y);
+    if (!t || g.isWater(t) || t.city || t.village) throw new Error('acampamento em casa inválida');
+    if (campSeen.has(k.x + ',' + k.y)) throw new Error('acampamentos sobrepostos');
+    campSeen.add(k.x + ',' + k.y);
+    if (!(k.str >= 1 && k.str <= PP.REBELS.maxStr)) throw new Error('força de acampamento inválida');
+  }
+  if (g.coalition != null && (!g.players[g.coalition] || !g.players[g.coalition].alive)) throw new Error('coalizão contra tribo morta');
 }
 
 (async () => {

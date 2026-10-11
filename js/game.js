@@ -1093,6 +1093,8 @@
       if (this.turn > 1) {
         const inc = this.income(p);
         p.stars += inc.stars; p.science += inc.sci;
+        // a renda líquida pode ser negativa (manutenção do exército, js/development.js): o tesouro nunca fica abaixo de zero
+        if (p.stars < 0 && this.settleDeficit) this.settleDeficit(p, inc);
         this.hook('income', p, inc);
       }
       for (const u of this.units) {

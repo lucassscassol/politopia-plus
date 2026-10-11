@@ -328,6 +328,9 @@
         victories: Object.assign({ ciencia: true, economia: true, maravilhas: true, territorio: true, diplomacia: true }, saved.lastVictories || {}),
         events: saved.lastEvents !== false,
         realm: saved.lastRealm !== false,
+        upkeep: saved.lastUpkeep !== false,
+        buildSlots: saved.lastSlots !== false,
+        rebels: saved.lastRebels !== false,
       };
       this.renderSetup(false);
     }
@@ -380,6 +383,7 @@
         else if (a === 'vic') s.victories[b.dataset.k] = !s.victories[b.dataset.k];
         else if (a === 'events') s.events = !s.events;
         else if (a === 'realm') s.realm = !s.realm;
+        else if (a === 'upkeep' || a === 'buildSlots' || a === 'rebels') s[a] = !s[a];
         else if (a === 'scenario') s.scenario = b.dataset.v;
         else if (a === 'back') { f.hidden = true; $('#menu-main').hidden = false; return; }
         if (s.slots.length < 2) s.slots.push({ tribe: PP.TRIBE_IDS.find(t => !s.slots.some(x => x.tribe === t)), human: false });
@@ -404,10 +408,12 @@
       const chk = PP.scenarioCheck(s.scenario, players);
       if (!chk.ok) { this.toast(`${PP.SCENARIOS[s.scenario].name}: ${chk.reason}.`, 'bad'); return; }
       Object.assign(this.settings, { lastTribe: s.slots[0].tribe, lastSize: s.size, lastMap: s.mapType, lastDiff: s.difficulty, lastVictory: s.victory,
-        lastScenario: s.scenario, lastVictories: s.victories, lastEvents: s.events, lastRealm: s.realm });
+        lastScenario: s.scenario, lastVictories: s.victories, lastEvents: s.events, lastRealm: s.realm,
+        lastUpkeep: s.upkeep, lastSlots: s.buildSlots, lastRebels: s.rebels });
       this.applySettings();
       const victories = Object.assign({ dominacao: true, pontos: victory === 'pontos' }, s.victories);
-      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit, victories, events: s.events, realm: s.realm, scenario: s.scenario, players });
+      const g = new PP.Game().setup({ size: s.size, mapType: s.mapType, difficulty: s.difficulty, victory, turnLimit, victories, events: s.events, realm: s.realm,
+        upkeep: s.upkeep, slots: s.buildSlots, rebels: s.rebels, scenario: s.scenario, players });
       this.attach(g, true);
     }
 
@@ -463,7 +469,7 @@
       if (fresh || this.hotseat) { const c = cap || g.citiesOf(p.id)[0]; if (c) this.r.centerOn(c.x, c.y, !fresh); }
       if (g.turn > 1) {
         const inc = g.income(p);
-        this.toast(`${PP.t('Turno {n}', { n: g.turn })} · +${inc.stars}★ · +${inc.sci}${SCI}`, 'gold');
+        this.toast(`${PP.t('Turno {n}', { n: g.turn })} · ${inc.stars < 0 ? '−' + -inc.stars : '+' + inc.stars}★ · +${inc.sci}${SCI}`, inc.stars < 0 ? 'bad' : 'gold');
       }
       if (fresh && !this.settings.seenHelp) { this.settings.seenHelp = true; this.applySettings(); this.openQuickStart(); }
       if (fresh && g.opts.scenario && g.opts.scenario !== 'normal') this.toast(PP.t('Cenário: {x}', { x: PP.SCENARIOS[g.opts.scenario].name }), 'gold');
@@ -946,6 +952,7 @@
         html += this.head(crest(co.color, c.capital ? 'ui_capital' : 'ui_city', 'crest-l'), `${esc(c.name)} <span class="tag">${PP.t('Nível {n}', { n: PP.roman(c.level) })}</span>${c.spec ? ` <span class="tag gold">${PP.SPECS[c.spec].name}</span>` : ''}${c.metropolis ? ` <span class="tag gold">${PP.t('Metrópole')}</span>` : ''}`, `${esc(co.name)}${c.capital ? ' · ' + PP.t('Capital') : ''} · ${ter.name}`, co.color);
         const status = g.cityStatus(c);
         if (status) html += `<p class="note"><span class="tag ${status.tag}">${status.name}</span>${mine ? ' ' + PP.t('Lealdade {n}/100.', { n: c.loyalty }) : ''}</p>`;
+        if (this.cityExtraNote) html += this.cityExtraNote(c, mine);
         if (mine && this.realmCityNote) html += this.realmCityNote(c);
         const need = c.level + 1;
         html += `<div class="popbar" aria-label="${PP.t('População')}">${Array.from({ length: need }, (_, k) => `<i class="${k < c.pop ? 'on' : ''}"></i>`).join('')}</div>`;
@@ -984,11 +991,13 @@
       if (t.fort) parts.push(PP.FORTS[t.fort.type].name);
       if (t.landmark) parts.push(PP.LANDMARKS[t.landmark].name);
       const ruinDef = t.ruin && t.ruinType ? PP.RUIN_TYPES[t.ruinType] : null;
-      const iconKey = t.wonder ? 'w_' + t.wonder : t.fort ? PP.FORTS[t.fort.type].icon : t.imp ? impIcon(t.imp) : t.res ? 'r_' + t.res : t.ruin ? 'ui_ruins' : t.landmark ? PP.LANDMARKS[t.landmark].icon : 'g_' + t.terrain;
-      const title = t.wonder ? PP.WONDERS[t.wonder].name : ruinDef ? ruinDef.name : t.ruin ? PP.t('Ruínas') : t.fort ? PP.FORTS[t.fort.type].name : t.landmark && !t.imp && !t.res ? PP.LANDMARKS[t.landmark].name : parts[parts.length > 1 ? 1 : 0];
+      const extra = this.tileExtra ? this.tileExtra(t) : null; // ex.: acampamento rebelde (js/ui-development.js)
+      const iconKey = extra ? extra.icon : t.wonder ? 'w_' + t.wonder : t.fort ? PP.FORTS[t.fort.type].icon : t.imp ? impIcon(t.imp) : t.res ? 'r_' + t.res : t.ruin ? 'ui_ruins' : t.landmark ? PP.LANDMARKS[t.landmark].icon : 'g_' + t.terrain;
+      const title = extra ? extra.title : t.wonder ? PP.WONDERS[t.wonder].name : ruinDef ? ruinDef.name : t.ruin ? PP.t('Ruínas') : t.fort ? PP.FORTS[t.fort.type].name : t.landmark && !t.imp && !t.res ? PP.LANDMARKS[t.landmark].name : parts[parts.length > 1 ? 1 : 0];
       const sub = (owner ? PP.t('Território de {p}', { p: esc(owner.name) }) : PP.t('Sem dono')) + ' · ' + parts.join(' · ');
       html += this.head(ico(iconKey), title, sub, null);
       const info = [];
+      if (extra && extra.info) info.push(extra.info);
       if (ter.info) info.push(ter.info + '.');
       if (t.res && PP.RESOURCES[t.res].info) info.push(PP.RESOURCES[t.res].info + '.');
       if (ruinDef) {
@@ -1176,7 +1185,7 @@
         case 'tech': {
           if (!this.myTurn()) { this.toast(PP.t('Espere a sua vez.'), 'bad'); break; }
           const p = this.me();
-          if (d.v === 'future') { if (!g.researchFuture(p)) this.toast(PP.t('Ciência insuficiente.'), 'bad'); }
+          if (d.v === 'future') { if (!g.researchFuture(p, d.perk)) this.toast(PP.t('Ciência insuficiente.'), 'bad'); }
           else {
             const st = g.techState(p, d.v);
             if (st === 'done') break;
@@ -1296,6 +1305,7 @@
           <span class="cc star">${chk.cost}★${chk.cost !== d.cost ? ` <small class="muted">(${d.cost})</small>` : ''}</span>
           <span class="mini-stats"><span>${ico('s_hp')}${d.hp}</span><span>${ico('s_atk')}${fmt(d.atk)}</span><span>${ico('s_def')}${d.def}</span><span>${ico('s_move')}${d.move}</span><span>${ico('s_range')}${d.range}</span></span>
           <span class="cd">${d.skills.map(k => (PP.SKILL_NAMES[k] || '').split(' (')[0]).join(', ')}${needs}</span>
+          ${this.unitCardExtra ? this.unitCardExtra(type, c) : ''}
           ${chk.ok ? '' : `<span class="cr">${esc(chk.reason)}</span>`}</button>`;
       }).join('');
       const blds = PP.BUILDING_ORDER.map(id => {
@@ -1328,7 +1338,7 @@
           ${this.citySections(c)}
           ${this.realmCitySection ? this.realmCitySection(c) : ''}
           <div class="sec-lbl">${PP.t('Recrutar')}${g.unitAt(c.x, c.y) ? ' · ' + PP.t('a cidade precisa estar desocupada (navios nascem no porto)') : ''}</div><div class="grid">${units}</div>
-          <div class="sec-lbl">${PP.t('Construções')}</div><div class="grid">${blds}</div>
+          <div class="sec-lbl">${PP.t('Construções')}${this.buildingsLabelExtra ? this.buildingsLabelExtra(c) : ''}</div><div class="grid">${blds}</div>
         </div>`;
       if (refresh) this.replaceModal('city', html); else this.openModal('city', html);
     }
@@ -1369,7 +1379,8 @@
         }
         html += '</div></div>';
       }
-      if (g.allTechs(p)) {
+      if (g.allTechs(p) && this.futureSection) html += this.futureSection(p); // avanços do futuro (js/ui-development.js)
+      else if (g.allTechs(p)) {
         const c = g.futureCost(p);
         html += `<div class="era"><h3>${PP.t('Além')}</h3><div class="grid"><button type="button" class="card ${p.science >= c ? 'go sci-go' : ''}" data-m="tech" data-v="future">
           <div class="card-row">${ico('t_future', 'ci')}<span class="cn">${PP.t('Tecnologia do Futuro {n}', { n: (p.future || 0) + 1 })}</span></div>
@@ -1632,6 +1643,15 @@
           ${h('Termos de paz e vassalos')}
           ${p('Cada guerra tem um <b>placar</b>: tropas derrotadas, cidades tomadas (capitais valem o dobro) e saques. Quem está ganhando pode <b>exigir termos</b> para assinar a paz: <b>reparações</b> (estrelas por turno durante 8 turnos), a <b>cessão de uma cidade</b> (nunca a capital nem a última) ou a <b>vassalagem</b>. Toda paz abre uma <b>trégua</b> de 10 turnos; rompê-la custa 2 de reputação, como romper um pacto.')}
           ${p('<b>Vassalos</b> ficam aliados do suserano (visão compartilhada), pagam 15% da renda em estrelas como tributo (25% no Feudalismo, 20% no Império), entram nas guerras do suserano, não declaram guerra nem fazem alianças sozinhos e não negociam a paz de uma guerra do suserano. Uma tribo fraca e amiga pode aceitar sua <b>proteção</b> em tempos de paz. O suserano pode libertar o vassalo ou, depois de 10 turnos e com boa relação, propor a <b>anexação</b> (8★ por cidade): as cidades, tropas e o tesouro do vassalo passam para ele. O vassalo pode <b>declarar independência</b> a qualquer momento, o que vira guerra.')}
+          ${h('Exército e crescimento')}
+          ${p('Com a <b>manutenção do exército</b> ligada, cada tropa custa estrelas por turno conforme o preço: 0,5★ até 3★, 1★ até 6★, 1,5★ até 10★ e 2★ acima disso (Gigantes não custam). Cada cidade sustenta 1 tropa de graça (a capital, 2), mais 1 com Quartel, mais 1 com Caserna e mais 2 se for militar; as mais baratas usam essas vagas primeiro. Tropas terrestres fora do abastecimento custam 50% a mais, o Feudalismo corta a conta em 25% e as frações de estrela são perdoadas. Se o tesouro não cobrir a conta, uma tropa deserta por turno: dissolva as tropas velhas antes disso.')}
+          ${p('Na cidade, <b>Investir em crescimento</b> dá +1 de população por estrelas, uma vez por turno; o custo sobe com o nível. Os <b>projetos de cidade</b> duram 3 turnos, um de cada vez: <b>Festival</b> (+15 de lealdade e +1 de população no fim), <b>Mecenato</b> (ciência a cada turno) e <b>Exercícios militares</b> (XP para as tropas na cidade e ao lado). As construções de segundo nível (Biblioteca Ampliada, Casa da Moeda, Armazéns, Catedral e Caserna) somam aos efeitos da primeira.')}
+          ${p('Com as <b>vagas de construção</b> ligadas, o nível limita quantas construções a cidade tem: 2 no nível 1, 3 no nível 3 e mais 1 a cada 2 níveis, +1 na capital e +1 na Metrópole. Muralhas, Chancelaria, Paço Regional, Embaixada e as de segundo nível não ocupam vaga. Toque numa construção pronta para demolir e liberar a vaga (reconstruir não dá a população de novo).')}
+          ${p('Depois da árvore inteira, cada <b>Tecnologia do Futuro</b> traz um avanço à escolha: Comércio Global, Método Científico, Logística Moderna, Urbanismo, Administração Moderna ou Táticas Modernas.')}
+          ${h('Cerco, rebeldes e coalizão')}
+          ${p('Uma cidade com 2 ou mais tropas inimigas ao lado, e mais inimigos do que defensores em volta, fica <b>sitiada</b>: produz metade, não recebe investimento nem projetos novos e a defesa cai 10% por turno de cerco (até −40%). A partir do 2º turno a guarnição perde 2 de vida por turno e, do 3º em diante, a cidade perde população. Quebre o cerco atacando as tropas em volta.')}
+          ${p('Cidades conquistadas em resistência fazem surgir <b>guerrilheiros</b> da tribo que as fundou, se ela estiver viva e em guerra com você. <b>Acampamentos rebeldes</b> surgem em terras vazias e perto de cidades que resistem: saqueiam melhorias, ferem tropas vizinhas e tiram lealdade e estrelas das cidades a até 2 casas. Entre num acampamento com uma tropa para destruí-lo e ficar com o saque.')}
+          ${p('Quando uma tribo passa a ter 60% mais pontos que a segunda, as outras formam uma <b>coalizão</b> contra ela. O Missionário pode <b>Pregar</b>: +20 de lealdade numa cidade sua, −15 numa cidade inimiga vizinha ou mais opinião de quem está em paz com você.')}
           ${h('Maravilhas')}
           ${p('Cada maravilha só pode ser construída uma vez no mundo, numa casa vazia do seu território. Todas dão +3 de população à cidade e 500 pontos, além do efeito próprio.')}
           ${h('Tribos')}<ul>${tribes}</ul>

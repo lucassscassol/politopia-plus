@@ -23,6 +23,9 @@
           <div class="field"><span class="lbl">${PP.t('Outras vitórias')}${forced ? ' · ' + PP.t('o cenário define as vitórias') : ''}</span><div class="seg">${vic}</div></div>
           <div class="field"><span class="lbl">${PP.t('Eventos mundiais')}</span><div class="seg"><button type="button" class="${s.events ? 'on' : ''}" data-s="events">${s.events ? PP.t('Ativados') : PP.t('Desativados')}</button></div></div>
           <div class="field"><span class="lbl">${PP.t('Organização do reino')}</span><div class="seg"><button type="button" class="${s.realm ? 'on' : ''}" data-s="realm" title="${esc(PP.t('Desordem administrativa e alcance da corte'))}">${s.realm ? PP.t('Ativada') : PP.t('Desativada')}</button></div></div>
+          <div class="field"><span class="lbl">${PP.t('Manutenção do exército')}</span><div class="seg"><button type="button" class="${s.upkeep ? 'on' : ''}" data-s="upkeep" title="${esc(PP.t('Cada tropa custa estrelas por turno; cada cidade sustenta uma de graça'))}">${s.upkeep ? PP.t('Ativada') : PP.t('Desativada')}</button></div></div>
+          <div class="field"><span class="lbl">${PP.t('Vagas de construção')}</span><div class="seg"><button type="button" class="${s.buildSlots ? 'on' : ''}" data-s="buildSlots" title="${esc(PP.t('O nível da cidade limita quantas construções ela tem'))}">${s.buildSlots ? PP.t('Ativadas') : PP.t('Desativadas')}</button></div></div>
+          <div class="field"><span class="lbl">${PP.t('Rebeldes')}</span><div class="seg"><button type="button" class="${s.rebels ? 'on' : ''}" data-s="rebels" title="${esc(PP.t('Acampamentos rebeldes e guerrilheiros nas cidades conquistadas'))}">${s.rebels ? PP.t('Ativados') : PP.t('Desativados')}</button></div></div>
         </div>`;
     },
 

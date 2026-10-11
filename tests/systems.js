@@ -23,6 +23,8 @@ function blank(opts) {
   const g = new PP.Game().setup({
     seed: opts.seed || 4242, size: opts.size, mapType: 'continentes', victories: opts.victories, scenario: opts.scenario,
     players: tribes.map((t, i) => ({ tribe: t, human: opts.humans.indexOf(i) >= 0 })),
+    // regras de 2.4 desligadas nos tabuleiros de teste, a não ser quando o teste pede
+    upkeep: !!opts.upkeep, slots: !!opts.slots, siege: !!opts.siege, rebels: !!opts.rebels,
   });
   for (const t of g.tiles) {
     Object.assign(t, { terrain: 'plains', res: null, imp: null, impLevel: 0, road: false, owner: -1, cityId: 0, city: 0, village: false, ruin: false,
@@ -1064,6 +1066,287 @@ function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p));
     L.stars = L.loan.left + 30;
     PP.AICrown.manageLoan(gl, L);
     ok(!L.loan, 'IA quita o empréstimo quando sobra');
+  });
+
+  // ---------------------------------------------------------------- Desenvolvimento e guerra (2.4)
+  await test('manutenção: custo por tropa, vagas gratuitas, abastecimento, Feudalismo e deserção', () => {
+    const g = blank({ players: 2, upkeep: true });
+    const c = city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
+    const p = g.players[0];
+    g.current = 0;
+    ok(g.unitUpkeep('warrior') === 0.5 && g.unitUpkeep('swordsman') === 1 && g.unitUpkeep('knight') === 1.5 && g.unitUpkeep('cannon') === 2 && g.unitUpkeep('giant') === 0, 'custo por faixa de preço');
+    unit(g, 'swordsman', 0, 3, 4); unit(g, 'swordsman', 0, 4, 4); const k1 = unit(g, 'knight', 0, 2, 4); unit(g, 'knight', 0, 4, 2);
+    refresh(g);
+    let up = g.upkeepOf(p);
+    ok(up.free === 2 && up.units === 4 && up.raw === 3 && up.total === 3, 'cada cidade sustenta 1 tropa de graça (a capital, 2); as mais baratas primeiro (' + up.raw + ')');
+    const inc = g.income(p);
+    ok(inc.upkeep === 3 && inc.lines.some(l => l.label === PP.t('Manutenção do exército') && l.stars === -3), 'a manutenção entra na renda');
+    p.techs.estrategia = true;
+    g.build(p, c, 'barracks');
+    ok(g.upkeepOf(p).free === 3 && g.upkeepOf(p).raw === 1.5 && g.upkeepOf(p).total === 1, 'Quartel sustenta mais 1; frações de estrela perdoadas');
+    place(g, k1, 9, 3); refresh(g);
+    up = g.upkeepOf(p);
+    ok(up.unsupplied === 1 && up.raw === 2.25, 'fora do abastecimento custa 50% a mais (' + up.raw + ')');
+    p.gov = 'feudalismo'; p.anarchyUntil = 0;
+    ok(g.upkeepMult(p) === 0.75, 'Feudalismo: −25%');
+    p.gov = 'tribal';
+    p.stars = -5;
+    const before = g.units.filter(u => u.owner === 0).length;
+    const inc2 = { stars: -5 };
+    g.settleDeficit(p, inc2);
+    ok(p.stars === 0 && inc2.deficit === 5 && g.units.filter(u => u.owner === 0).length === before - 1 && k1.dead, 'sem estrelas, a tropa mais cara fora das cidades deserta');
+    const g2 = blank({ players: 2 });
+    city(g2, 0, 3, 3, true);
+    for (let i = 0; i < 4; i++) unit(g2, 'knight', 0, 2 + i, 5);
+    ok(g2.income(g2.players[0]).upkeep === 0 && g2.upkeepOf(g2.players[0]).total === 0, 'desligada: sem manutenção');
+  });
+
+  await test('investir em crescimento: custo, uma vez por turno e ocupação', () => {
+    const g = blank({ players: 2 });
+    const c = city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
+    const p = g.players[0];
+    g.current = 0; c.level = 3; c.pop = 0;
+    const chk = g.investCheck(p, c);
+    ok(chk.ok && chk.cost === 8, 'custo 2 + 2 por nível');
+    const s0 = p.stars;
+    ok(g.invest(p, c) && c.pop === 1 && p.stars === s0 - 8 && p.stats.invested === 8, 'investe: +1 de população');
+    ok(!g.invest(p, c) && g.investCheck(p, c).reason === PP.t('Já recebeu investimento neste turno'), 'uma vez por turno');
+    g.turn++;
+    ok(g.investCheck(p, c).ok, 'no turno seguinte pode de novo');
+    p.futurePerks.urbanismo = 1;
+    ok(g.investCost(p, c) === 7, 'Urbanismo barateia');
+    c.occupied = 2;
+    ok(!g.investCheck(p, c).ok, 'cidade ocupada não recebe investimento');
+  });
+
+  await test('projetos de cidade: Festival, Mecenato e Exercícios militares', () => {
+    const g = blank({ players: 2 });
+    const c = city(g, 0, 3, 3, true), c2 = city(g, 0, 8, 3); city(g, 1, 12, 12, true);
+    const p = g.players[0];
+    g.current = 0; c.level = 4; c.pop = 0;
+    ok(g.cprojCheck(p, c, 'festival').cost === 8 && g.startCityProject(p, c, 'festival') && c.cproj.id === 'festival', 'Festival começa');
+    ok(!g.startCityProject(p, c, 'patronage') && g.cprojCheck(p, c, 'patronage').reason === PP.t('Outro projeto em andamento'), 'um projeto de cada vez');
+    ok(g.loyaltyFactors(c).some(f => f[0] === PP.CITY_PROJECTS.festival.name && f[1] === 15), 'Festival: +15 de lealdade');
+    g.advanceCityProjects(p); g.advanceCityProjects(p);
+    ok(c.cproj && c.cproj.left === 1 && c.pop === 0, 'dura 3 turnos');
+    g.advanceCityProjects(p);
+    ok(!c.cproj && c.pop === 1 && p.stats.projects === 1, 'Festival termina com +1 de população');
+    c2.level = 5;
+    g.startCityProject(p, c2, 'patronage');
+    const line = g.income(p).lines.find(l => l.label === PP.CITY_PROJECTS.patronage.name);
+    ok(line && line.sci === 5, 'Mecenato: +1 de ciência por nível');
+    ok(g.cancelCityProject(p, c2) && !c2.cproj, 'projeto cancelado');
+    const u = unit(g, 'warrior', 0, 4, 3);
+    g.startCityProject(p, c, 'drills');
+    g.advanceCityProjects(p);
+    ok(u.xp === 1, 'Exercícios: +1 de XP por turno');
+  });
+
+  await test('vagas de construção, demolição e construções de segundo nível', () => {
+    const g = blank({ players: 2, slots: true });
+    const cap = city(g, 0, 3, 3, true), c = city(g, 0, 8, 3); city(g, 1, 12, 12, true);
+    const p = g.players[0];
+    g.current = 0; p.stars = 500;
+    for (const t of ['organizacao', 'escrita', 'estrategia', 'meditacao', 'filosofia', 'educacao', 'comercio', 'economia', 'burocracia', 'arquitetura', 'construcao', 'espionagem']) p.techs[t] = true;
+    ok(g.buildSlots(c) === 2 && g.buildSlots(cap) === 3, 'nível 1: 2 vagas (+1 na capital)');
+    c.level = 5;
+    ok(g.buildSlots(c) === 4, 'nível 5: 4 vagas');
+    c.level = 1;
+    ok(g.build(p, c, 'granary') && g.build(p, c, 'library'), 'duas construções');
+    const chk = g.buildingCheck(p, c, 'temple');
+    ok(!chk.ok && chk.noSlot, 'sem vagas: ' + chk.reason);
+    ok(g.build(p, c, 'walls'), 'Muralhas não ocupam vaga');
+    ok(g.buildingCheck(p, c, 'library2').ok && g.build(p, c, 'library2') && g.usedSlots(c) === 2, 'Biblioteca Ampliada não ocupa vaga');
+    ok(!g.demolishCheck(p, c, 'library').ok, 'não demole o que a de segundo nível exige');
+    ok(!g.demolishCheck(p, c, 'walls').ok, 'Muralhas não são demolidas (não ocupam vaga)');
+    const lv = c.level, pop = c.pop;
+    ok(g.demolish(p, c, 'granary') && !c.buildings.granary && c.razed.granary && g.freeSlots(c) === 1, 'demolir libera a vaga');
+    g.build(p, c, 'granary');
+    ok(c.buildings.granary && c.level === lv && c.pop === pop, 'reconstruir não dá a população de novo');
+    const sci0 = g.cityIncome(cap).sci;
+    g.build(p, cap, 'library'); const sci1 = g.cityIncome(cap).sci;
+    g.build(p, cap, 'library2');
+    ok(g.cityIncome(cap).sci === sci1 + 2 && sci1 > sci0, 'Biblioteca Ampliada: +2 de ciência');
+    cap.level = 6;
+    g.build(p, cap, 'bank'); const st1 = g.cityIncome(cap).stars;
+    g.build(p, cap, 'bank2');
+    ok(g.cityIncome(cap).stars === st1 + 3, 'Casa da Moeda: +3★');
+    g.build(p, cap, 'barracks'); const capa = g.capacity(cap);
+    g.build(p, cap, 'barracks2');
+    ok(g.capacity(cap) === capa + 2 && g.freeSupport(p).total === 2 + 1 + 2, 'Caserna: +2 de capacidade e +1 tropa sustentada');
+    g.build(p, cap, 'temple'); g.build(p, cap, 'temple2');
+    ok(g.loyaltyFactors(cap).some(f => f[0] === PP.BUILDINGS.temple2.name && f[1] === 10) && g.cityHealBonus(cap) >= 2, 'Catedral: lealdade e cura');
+    const g2 = blank({ players: 2 });
+    const c3 = city(g2, 0, 3, 3);
+    g2.current = 0; g2.players[0].techs.organizacao = true; g2.players[0].techs.escrita = true; g2.players[0].techs.meditacao = true; g2.players[0].techs.estrategia = true;
+    ok(['granary', 'library', 'temple', 'barracks'].every(id => g2.build(g2.players[0], c3, id)), 'vagas desligadas: sem limite');
+  });
+
+  await test('avanços do futuro', () => {
+    const g = blank({ players: 2, upkeep: true });
+    const c = city(g, 0, 3, 3, true); city(g, 1, 12, 12, true);
+    const p = g.players[0];
+    g.current = 0; c.level = 8;
+    for (const t of PP.TECHS) p.techs[t.id] = true;
+    p.science = 5000;
+    const s0 = g.income(p).stars;
+    ok(g.researchFuture(p, 'comercio_global') && p.future === 1 && p.futurePerks.comercio_global === 1, 'pesquisa com avanço escolhido');
+    const line = g.income(p).lines.find(l => l.label === PP.FUTURE_PERKS.comercio_global.name);
+    ok(line && line.stars === Math.round(s0 * 0.05), 'Comércio Global: +5% de estrelas');
+    ok(g.researchFuture(p, 'taticas') && g.researchFuture(p, 'taticas') && !g.researchFuture(p, 'taticas'), 'nível máximo respeitado');
+    const a = unit(g, 'swordsman', 0, 5, 5), d = unit(g, 'warrior', 1, 6, 5);
+    const r = g.combatMods(a, d, g.stat(a), g.stat(d));
+    ok(Math.abs(r.atk - 1.2) < 0.001 || r.atk > 1.19, 'Táticas Modernas: +20% de ataque');
+    const cap0 = g.adminCapacity(p).total;
+    g.researchFuture(p, 'administracao');
+    ok(g.adminCapacity(p).total === cap0 + 1, 'Administração Moderna: +1 de capacidade');
+    const before = Object.values(p.futurePerks).reduce((s, n) => s + n, 0);
+    ok(g.researchFuture(p) && Object.values(p.futurePerks).reduce((s, n) => s + n, 0) === before + 1, 'sem escolha: o primeiro avanço disponível');
+    ok(g.upkeepMult(p) === 1 && (g.researchFuture(p, 'logistica'), Math.abs(g.upkeepMult(p) - 0.9) < 1e-9), 'Logística Moderna: −10% de manutenção');
+  });
+
+  await test('cerco: defesa, produção, fome e fim', () => {
+    const g = blank({ players: 2, siege: true });
+    city(g, 0, 3, 3, true); const c = city(g, 1, 10, 10, true);
+    const p1 = g.players[1];
+    const gar = unit(g, 'defender', 1, 10, 10);
+    const e1 = unit(g, 'swordsman', 0, 9, 10);
+    unit(g, 'swordsman', 0, 11, 10);
+    refresh(g);
+    ok(g.isBesieged(c), 'duas tropas inimigas ao lado: cercada');
+    const d0 = g.defenseBonus(gar, e1);
+    g.turn = 2; g.current = 1;
+    g.updateSieges(p1);
+    ok(c.siege === 1 && Math.abs(g.defenseBonus(gar, e1) - d0 * 0.9) < 1e-9, 'defesa −10% no 1º turno de cerco');
+    ok(g.cityYieldMult(c) === 0.5 && !g.investCheck(p1, c).ok, 'produção pela metade e sem investimento');
+    const hp = gar.hp; c.pop = 1;
+    g.updateSieges(p1);
+    ok(c.siege === 2 && gar.hp === hp - 2, 'fome: a guarnição perde 2 de vida');
+    g.updateSieges(p1);
+    ok(c.siege === 3 && c.pop === 0, 'a cidade perde população');
+    const def = unit(g, 'defender', 1, 10, 9), def2 = unit(g, 'defender', 1, 10, 11);
+    refresh(g);
+    ok(!g.isBesieged(c), 'defensores em volta quebram o cerco');
+    g.updateSieges(p1);
+    ok(c.siege === 0 && g.cityYieldMult(c) === 1, 'cerco encerrado');
+    g.killUnit(def); g.killUnit(def2);
+    const g2 = blank({ players: 2 });
+    const c2 = city(g2, 1, 10, 10, true);
+    unit(g2, 'swordsman', 0, 9, 10); unit(g2, 'swordsman', 0, 11, 10);
+    ok(!g2.isBesieged(c2), 'desligado: sem cerco');
+  });
+
+  await test('rebeldes: acampamentos, saque, limpeza, partidas sem rebeldes e guerrilheiros', () => {
+    const g = blank({ players: 3, rebels: true, siege: true });
+    meetAll(g);
+    const c = city(g, 0, 3, 3, true); city(g, 1, 12, 3, true); city(g, 2, 3, 12, true);
+    const p = g.players[0];
+    g.current = 0;
+    const farm = g.tile(4, 4);
+    farm.imp = 'farm'; farm.owner = 0; farm.cityId = c.id;
+    const k = g.spawnCamp(g.tile(5, 5), 1, 'wild');
+    ok(g.camps.length === 1 && g.campAt(5, 5) === k, 'acampamento criado');
+    ok(g.loyaltyFactors(c).some(f => f[0] === PP.t('Rebeldes na região')), 'tira lealdade das cidades próximas');
+    const inc = g.cityIncome(c);
+    ok(inc.notes.some(n => /Rebeldes/.test(n)), 'tira estrelas das cidades próximas');
+    g.turn = k.last + PP.REBELS.raidEvery;
+    g.campsAct();
+    ok(farm.pillaged, 'saqueia uma melhoria vizinha');
+    g.turn = k.since + PP.REBELS.growEvery;
+    g.campsAct();
+    ok(k.str === 2, 'cresce com o tempo');
+    const u = unit(g, 'swordsman', 0, 5, 4);
+    refresh(g);
+    const s0 = p.stars, hp = u.hp;
+    g.moveUnit(u, 5, 5);
+    ok(!g.campAt(5, 5) && p.stars === s0 + g.campLoot({ str: 2 }) && u.hp === hp - g.campDamage({ str: 2 }) && p.stats.campsCleared === 1, 'tropa que entra destrói o acampamento e recolhe o saque');
+    // acampamentos novos em terras sem dono
+    g.turn = PP.REBELS.start;
+    g.campsSpawn();
+    ok(g.camps.length === 1 && g.tile(g.camps[0].x, g.camps[0].y).owner === -1, 'surge acampamento em terra sem dono');
+    // guerrilheiros: cidade conquistada que resiste, fundador vivo e em guerra
+    const enemyCity = g.cityMap[g.players[1].capital];
+    g.transferCity(enemyCity, 0);
+    enemyCity.founder = 1; enemyCity.unrest = true; enemyCity.occupied = 0; enemyCity.loyalty = 30;
+    const keep = PP.REBELS.partisan;
+    PP.REBELS.partisan = 1;
+    g.turn = 40;
+    try { g.unrestRebels(p); } finally { PP.REBELS.partisan = keep; }
+    ok(g.units.some(x => x.owner === 1 && Math.max(Math.abs(x.x - enemyCity.x), Math.abs(x.y - enemyCity.y)) === 1) && g.players[1].stats.partisans === 1, 'guerrilheiros do fundador surgem ao lado');
+    const g2 = blank({ players: 2 });
+    g2.turn = PP.REBELS.start;
+    PP.SYSTEMS.find(s => s.name === 'warfare').newRound(g2);
+    ok(!g2.camps.length, 'desligados: sem acampamentos');
+  });
+
+  await test('coalizão contra o líder e Pregar', () => {
+    const g = blank({ players: 3 });
+    meetAll(g);
+    const c0 = city(g, 0, 3, 3, true); city(g, 1, 12, 3, true); city(g, 2, 3, 12, true);
+    for (const [x, y] of [[7, 7], [10, 8], [6, 10]]) city(g, 0, x, y).level = 9;
+    c0.level = 12;
+    g.turn = PP.COALITION.turn;
+    g.updateCoalition();
+    ok(g.coalition === 0 && g.inCoalition(1) && g.inCoalition(2) && !g.inCoalition(0), 'coalizão contra quem disparou na frente');
+    ok(g.memorySummary(1, 0).some(m => m.kind === 'coalition'), 'as outras tribos desconfiam do líder');
+    for (const c of g.citiesOf(0)) if (!c.capital) g.transferCity(c, c.x > 8 ? 1 : 2);
+    c0.level = 1;
+    g.updateCoalition();
+    ok(g.coalition == null, 'a coalizão se desfaz quando o equilíbrio volta');
+    // Pregar
+    g.current = 0;
+    const conq = g.citiesOf(0).find(c => !c.capital) || city(g, 0, 8, 8);
+    conq.founder = 1; conq.loyalty = 30;
+    const m = unit(g, 'missionary', 0, conq.x + 1, conq.y);
+    refresh(g);
+    const chk = g.abilityCheck(m, 'preach');
+    ok(chk.ok && chk.target === conq, 'Pregar disponível ao lado da cidade');
+    ok(g.useAbility(m, 'preach') && conq.loyalty === 50 && m.cd.preach > g.turn, 'Pregar: +20 de lealdade e recarga');
+    const enemy = g.cityMap[g.players[2].capital];
+    enemy.founder = 0; enemy.loyalty = 40;
+    const m2 = unit(g, 'missionary', 0, enemy.x + 1, enemy.y);
+    refresh(g);
+    ok(g.useAbility(m2, 'preach') && enemy.loyalty === 25, 'numa cidade inimiga: −15 de lealdade');
+    g.makePeace(0, 1);
+    const ally = g.cityMap[g.players[1].capital];
+    const m3 = unit(g, 'missionary', 0, ally.x - 1, ally.y);
+    refresh(g);
+    ok(g.useAbility(m3, 'preach') && g.memorySummary(1, 0).some(x => x.kind === 'preached'), 'em paz: melhora a opinião');
+  });
+
+  await test('2.4: salvar e carregar, partidas antigas e a IA usa as mecânicas', async () => {
+    const g = blank({ players: 3, upkeep: true, slots: true, siege: true, rebels: true });
+    meetAll(g);
+    const c = city(g, 0, 3, 3, true); city(g, 1, 12, 3, true); city(g, 2, 3, 12, true);
+    const p = g.players[0];
+    g.current = 0; c.level = 4;
+    p.techs.organizacao = true;
+    g.build(p, c, 'granary'); g.demolish(p, c, 'granary');
+    g.startCityProject(p, c, 'festival');
+    g.spawnCamp(g.tile(7, 7), 2, 'wild');
+    g.coalition = 1; c.siege = 1;
+    for (const t of PP.TECHS) p.techs[t.id] = true;
+    p.science = 999; g.researchFuture(p, 'metodo');
+    refresh(g);
+    const json = JSON.parse(JSON.stringify(g.toJSON()));
+    const g2 = PP.Game.fromJSON(json);
+    const c2 = g2.cityMap[c.id];
+    ok(c2.cproj.id === 'festival' && c2.razed.granary && c2.siege === 1 && g2.camps.length === 1 && g2.camps[0].str === 2 && g2.coalition === 1 && g2.players[0].futurePerks.metodo === 1, 'projetos, demolições, cerco, acampamentos, coalizão e avanços salvos');
+    ok(g2.upkeepOn() && g2.slotsOn() && g2.siegeOn() && g2.rebelsOn(), 'opções salvas');
+    ok(JSON.stringify(g2.toJSON()) === JSON.stringify(json), 'ida e volta idêntica');
+    for (const f of ['v1-solo.json', 'v1-hotseat.json']) {
+      const old = PP.Game.fromJSON(JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', f), 'utf8')).game);
+      ok(!old.upkeepOn() && !old.slotsOn() && !old.siegeOn() && !old.rebelsOn(), f + ': regras novas desligadas');
+      ok(old.cities.every(x => x.cproj === null && x.siege === 0 && x.invested === 0) && old.players.every(x => x.futurePerks && !Object.keys(x.futurePerks).length), f + ': valores padrão');
+      ok(old.players.every(x => !old.income(x).lines.some(l => l.label === PP.t('Manutenção do exército'))), f + ': renda sem manutenção');
+    }
+    // a IA usa investimento, projetos e respeita as vagas numa partida curta
+    const ga = new PP.Game().setup({ seed: 4040, size: 18, mapType: 'continentes', players: ['vikar', 'qadir', 'zambe', 'hanlu'].map(t => ({ tribe: t })) });
+    for (let i = 0; i < 50 * 4 && !ga.over; i++) { await PP.AI.takeTurn(ga); if (!ga.over) ga.endTurn(); }
+    ok(ga.players.some(x => (x.stats.invested || 0) > 0), 'a IA investe em crescimento');
+    ok(ga.players.some(x => (x.stats.projects || 0) > 0), 'a IA faz projetos de cidade');
+    ok(ga.players.some(x => (x.stats.upkeepPaid || 0) > 0), 'a IA paga manutenção');
+    ok(ga.cities.every(x => ga.usedSlots(x) <= ga.buildSlots(x) || x.founder !== x.owner), 'a IA respeita as vagas nas próprias cidades');
   });
 
   console.log(`\n${passed} verificações ok, ${failed} falhas`);

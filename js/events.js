@@ -94,7 +94,7 @@
       const far = t => this.cities.every(c => Math.max(Math.abs(c.x - t.x), Math.abs(c.y - t.y)) >= 3) &&
         this.tiles.every(o => !o.village || Math.max(Math.abs(o.x - t.x), Math.abs(o.y - t.y)) >= 3);
       const cands = this.rng.shuffle(this.tiles.filter(t => !this.isWater(t) && t.terrain !== 'mountain' && t.owner === -1 &&
-        !t.res && !t.ruin && !t.fort && !t.landmark && !t.wonder && !this.uGrid[t.y * W + t.x]));
+        !t.res && !t.ruin && !t.fort && !t.landmark && !t.wonder && !this.uGrid[t.y * W + t.x] && !(this.campAt && this.campAt(t.x, t.y))));
       let n = 0;
       const want = 1 + (this.W >= 22 ? 1 : 0);
       for (const t of cands) {

@@ -121,7 +121,7 @@
         case 'agricola': stars -= 1; sci -= 1; notes.push(PP.t('Agrícola −1★ −1⚗')); break;
         case 'porto': {
           const sea = this.seaTiles(c);
-          const add = Math.min(3, sea);
+          const add = Math.min(PP.SPECS.porto.seaMax || 3, sea);
           if (add) { stars += add; notes.push(PP.t('Portuária +{n}★', { n: add })); }
           if (this.specActive(c, 'customs')) { const a2 = Math.min(4, sea); stars += a2; if (a2) notes.push(PP.t('{b} +{n}★', { b: PP.BUILDINGS.customs.name, n: a2 })); }
           break;

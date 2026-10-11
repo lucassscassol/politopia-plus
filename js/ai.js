@@ -5,7 +5,9 @@
   const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   const AI = {};
   // Pontos de extensão para módulos de IA de outros sistemas (ex.: js/ai-realm.js): techValue, buildingValue,
-  // techMult, spendOptions e actCharacter. Cada um é opcional.
+  // techMult, spendOptions, actCharacter e goals. Cada um é opcional.
+  // As opções de gasto de construções e unidades trazem kind ('building' ou 'unit'), id/type, city e, nas
+  // construções, o valor v (score = v / (custo + 1)), para que os módulos possam reavaliá-las.
   AI.ext = {};
 
   // ------------------------------------------------------------ Decisões pontuais (chamadas pelo motor)
@@ -673,6 +675,8 @@
       }
       // caçar inimigos visíveis
       if (!isScout) for (const e of this.enemies) push(e.y * W + e.x, 3 * this.aggr * (defensive ? 0.5 : 1), 'hunt', 2);
+      // objetivos de outros módulos (ex.: acampamentos rebeldes em js/ai-development.js)
+      if (AI.ext.goals) AI.ext.goals(this, u, push);
       // explorar a fronteira do desconhecido
       const exploreV = (g.turn < 15 ? 4 : 1.5) * (isScout ? 2.5 : 1) * (defensive ? 0.3 : 1);
       for (let i = 0; i < g.tiles.length; i++) {
@@ -849,7 +853,7 @@
           }
           if (strat === 'ciencia' && ['library', 'university', 'observatory', 'academy_hall'].indexOf(id) >= 0) v *= 1.4;
           if (strat === 'economia' && ['bank', 'guild', 'exchange', 'customs'].indexOf(id) >= 0) v *= 1.4;
-          if (v > 0) out.push({ score: v / (chk.cost + 1), cost: chk.cost, exec: () => g.build(p, c, id) });
+          if (v > 0) out.push({ score: v / (chk.cost + 1), cost: chk.cost, v, kind: 'building', id, city: c, exec: () => g.build(p, c, id) });
         }
       }
       // Maravilhas
@@ -877,15 +881,17 @@
         const type = this.chooseUnitType(c, occupied);
         if (!type) continue;
         const th = this.threats[c.id] || 0;
-        out.push({ score: base + (th > 0 ? 0.3 : 0), cost: g.unitCostFor(p, c, type), exec: () => !!g.train(p, c, type) });
+        out.push({ score: base + (th > 0 ? 0.3 : 0), cost: g.unitCostFor(p, c, type), kind: 'unit', type, city: c, threat: th, exec: () => !!g.train(p, c, type) });
       }
       // Espiões (poucos, quando há guerras ou foco em ciência)
       if (g.has(p, 'espionagem')) {
         const spies = g.unitsOf(p.id).filter(u => UN[u.type].spy).length;
-        const want = (this.analysis && this.analysis.wars) || this.strategy === 'ciencia' ? Math.min(2, 1 + Math.floor(this.cities.length / 4)) : 0;
+        // um espião para vigiar os vizinhos; mais quando há guerra ou foco em ciência
+        const met = g.players.filter(q => q.alive && q.id !== p.id && p.met[q.id]).length;
+        const want = (this.analysis && this.analysis.wars) || this.strategy === 'ciencia' ? Math.min(2, 1 + Math.floor(this.cities.length / 4)) : met >= 2 && this.cities.length >= 3 ? 1 : 0;
         if (spies < want) {
           const c = this.cities.find(x => !g.unitAt(x.x, x.y) && g.trainCheck(p, x, 'spy').reason !== PP.t('Capacidade máxima'));
-          if (c) out.push({ score: 0.3, cost: g.unitCostFor(p, c, 'spy'), exec: () => !!g.train(p, c, 'spy') });
+          if (c) out.push({ score: 0.3, cost: g.unitCostFor(p, c, 'spy'), kind: 'unit', type: 'spy', city: c, exec: () => !!g.train(p, c, 'spy') });
         }
       }
       if (AI.ext.spendOptions) AI.ext.spendOptions(this, out);
