@@ -30,6 +30,9 @@ import java.util.Map;
  * (o mesmo domínio reservado que o WebViewAssetLoader usa), o que dá ao jogo uma origem https
  * estável: o localStorage com as partidas salvas persiste e as fontes locais carregam sem CORS.
  * Nada é baixado da internet.
+ *
+ * A versão da Play Store (android/play) estende esta classe: PlayActivity liga a loja e os anúncios pelos
+ * ganchos onWebReady, handleBack, hideSystemUi e runJs.
  */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
@@ -40,10 +43,10 @@ public class MainActivity extends Activity {
         "(function(){try{return !!(window.PP&&PP.ui&&PP.ui.handleBack&&PP.ui.handleBack());}catch(e){return false;}})()";
     private static final String JS_SAVE =
         "(function(){try{if(window.PP&&PP.ui&&PP.ui.myTurn&&PP.ui.myTurn())PP.ui.save();}catch(e){}})()";
-    private static final String JS_MUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(true);}catch(e){}})()";
-    private static final String JS_UNMUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(false);}catch(e){}})()";
+    protected static final String JS_MUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(true);}catch(e){}})()";
+    protected static final String JS_UNMUTE = "(function(){try{if(window.PP&&PP.audio)PP.audio.background(false);}catch(e){}})()";
 
-    private WebView web;
+    protected WebView web;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -73,6 +76,7 @@ public class MainActivity extends Activity {
 
         web.setWebViewClient(new AssetClient(getAssets()));
         setContentView(web);
+        onWebReady(web);
 
         if (state == null || web.restoreState(state) == null) web.loadUrl(START);
         hideSystemUi();
@@ -120,13 +124,36 @@ public class MainActivity extends Activity {
         if (hasFocus) hideSystemUi();
     }
 
+    /** Chamado com a WebView pronta, antes de carregar o jogo (a versão da Play registra a ponte aqui). */
+    protected void onWebReady(WebView view) {
+    }
+
+    /** Roda um trecho de JavaScript no jogo, de qualquer thread. */
+    protected void runJs(final String js) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (web != null) web.evaluateJavascript(js, null);
+            }
+        });
+    }
+
     @Override
+    @SuppressWarnings("deprecation")
     public void onBackPressed() {
         if (web == null) {
             super.onBackPressed();
             return;
         }
-        // o jogo fecha janelas, a seleção ou abre o menu; sem nada a fechar, o app vai para o fundo
+        handleBack();
+    }
+
+    // o jogo fecha janelas, a seleção ou abre o menu; sem nada a fechar, o app vai para o fundo
+    protected void handleBack() {
+        if (web == null) {
+            moveTaskToBack(true);
+            return;
+        }
         web.evaluateJavascript(JS_BACK, new ValueCallback<String>() {
             @Override
             public void onReceiveValue(String value) {
@@ -136,7 +163,7 @@ public class MainActivity extends Activity {
     }
 
     @SuppressWarnings("deprecation")
-    private void hideSystemUi() {
+    protected void hideSystemUi() {
         if (web == null) return;
         int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION

@@ -62,7 +62,7 @@
     unitCardExtra(type) {
       const g = this.game;
       if (!g.upkeepOn()) return '';
-      const v = g.unitUpkeep(type) * g.upkeepMult(this.me());
+      const v = g.unitUpkeepFor(this.me(), type) * g.upkeepMult(this.me());
       return v ? `<span class="cd">${PP.t('Manutenção: {n}★ por turno', { n: num(Math.round(v * 10) / 10) })}</span>` : '';
     },
 

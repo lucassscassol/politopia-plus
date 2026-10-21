@@ -1,0 +1,17 @@
+// Chamas de Vardren — app da Google Play (loja e anúncios). Veja android/play/README.md.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'ChamasDeVardren'
+include ':app'

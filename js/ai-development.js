@@ -36,7 +36,7 @@
     const negative = inc.stars < 0;
     if (!negative && !(b.upkeep >= 4 && b.upkeep > b.budget * 1.5)) return 0;
     const cities = g.citiesOf(p.id);
-    const army = g.units.filter(u => u.owner === p.id && !UN[u.type].character && g.unitUpkeep(u.type) > 0);
+    const army = g.units.filter(u => u.owner === p.id && !UN[u.type].character && g.unitUpkeepFor(p, u.type) > 0);
     const minArmy = 1 + cities.length;
     const enemies = g.units.filter(e => g.atWar(p.id, e.owner) && p.visible[e.y * g.W + e.x]);
     const cands = army.filter(u => {
@@ -184,7 +184,7 @@
       const up = g.upkeepOf(p);
       for (const o of out) {
         if (o.kind === 'unit') {
-          const add = up.units < up.free ? 0 : g.unitUpkeep(o.type) * up.mult;
+          const add = up.units < up.free ? 0 : g.unitUpkeepFor(p, o.type) * up.mult;
           if (b.upkeep + add > b.budget) o.score *= o.threat > 0 ? 0.5 : 0.08;
           if (add && b.net - add < 0 && !(o.threat > 0)) o.score = 0; // nunca recruta para ficar no vermelho
         } else if (o.kind === 'building' && (o.id === 'barracks' || o.id === 'barracks2')) {

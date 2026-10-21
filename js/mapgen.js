@@ -253,7 +253,7 @@
     capPos.forEach((c, i) => {
       const tribe = game.players[i].tribe;
       ensure(c, 1, 'fruit', ['plains', 'forest', 'desert', 'tundra'], 2);
-      const sig = SIGNATURE[tribe];
+      const sig = SIGNATURE[tribe] || PP.TRIBES[tribe].signature || ['crop', ['plains']];
       if (sig[0] === 'fish' && !ring(c, 1).some(t => t.terrain === 'water')) ensure(c, 1, 'game', ['forest'], 1);
       else ensure(c, 1, sig[0], sig[1], 1);
       ensure(c, 2, 'ore', ['hills', 'mountain'], 1);
@@ -265,7 +265,8 @@
     const EXCLUSIVE = { aymara: ['gems', ['hills', 'mountain']], tupina: ['spices', ['forest', 'swamp']], vikar: ['whale', ['ocean']],
       qadir: ['gems', ['desert', 'hills']], hanlu: ['spices', ['plains', 'forest']], zambe: ['horses', ['plains', 'desert']] };
     capPos.forEach((c, i) => {
-      const ex = EXCLUSIVE[game.players[i].tribe];
+      const tr = game.players[i].tribe;
+      const ex = EXCLUSIVE[tr] || PP.TRIBES[tr].exclusive || ['gems', ['hills', 'mountain']];
       for (let r = 2; r <= 4; r++) {
         const area = ring(c, r).filter(t => cheb(t.x, t.y, c.x, c.y) >= 2 && ex[1].indexOf(t.terrain) >= 0 && !locked[t.y * W + t.x]);
         if (area.some(t => t.res === ex[0])) { area.filter(t => t.res === ex[0]).forEach(t => { locked[t.y * W + t.x] = 1; }); break; }

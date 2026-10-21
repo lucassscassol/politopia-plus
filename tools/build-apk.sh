@@ -30,23 +30,10 @@ APK="$DIST/ChamasDeVardren-$VERSION.apk"
 echo "Chamas de Vardren $VERSION (versionCode $VCODE)"
 
 rm -rf "$OUT"
-mkdir -p "$OUT/assets/www/fonts" "$OUT/classes" "$OUT/dex" "$DIST"
+mkdir -p "$OUT/assets" "$OUT/classes" "$OUT/dex" "$DIST"
 
 # 1. Jogo: os mesmos arquivos da versão web, com as fontes locais no lugar do Google Fonts
-cp -R "$ROOT/index.html" "$ROOT/manifest.webmanifest" "$ROOT/css" "$ROOT/js" "$ROOT/assets" "$OUT/assets/www/"
-cp "$AND"/fonts/*.woff2 "$AND"/fonts/fonts.css "$AND"/fonts/OFL-*.txt "$OUT/assets/www/fonts/"
-python3 - "$OUT/assets/www/index.html" <<'PY'
-import re, sys
-p = sys.argv[1]
-html = open(p, encoding='utf-8').read()
-html, n = re.subn(r'<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">', '<link rel="stylesheet" href="fonts/fonts.css">', html)
-if n != 1: sys.exit('index.html: link do Google Fonts não encontrado')
-html = re.sub(r'\s*<link rel="preconnect" href="https://fonts\.[^"]*"( crossorigin)?>', '', html)
-html = re.sub(r'\s*<link rel="manifest" href="[^"]*">', '', html)
-if 'https://' in re.sub(r'<!--.*?-->', '', html, flags=re.S).split('<body')[0]:
-    sys.exit('index.html: ainda há recursos remotos no <head>')
-open(p, 'w', encoding='utf-8').write(html)
-PY
+"$ROOT/tools/stage-www.sh" "$OUT/assets/www"
 
 # 2. Código Java → classes.dex
 javac -nowarn -encoding UTF-8 --release 8 -cp "$SDK_JAR" -d "$OUT/classes" \

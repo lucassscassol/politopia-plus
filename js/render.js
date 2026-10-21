@@ -772,7 +772,7 @@
     // ---------------------------------------------------------- Vegetação e relevo (sprites)
     featureSprite(t) {
       const variant = Math.floor(hash(t.x, t.y, 3) * 3);
-      const style = TREES[t.biome] || 'pine';
+      const style = TREES[t.biome] || (PP.TRIBES[t.biome] && PP.TRIBES[t.biome].trees) || 'pine';
       const key = 'f|' + t.terrain + '|' + variant + '|' + (t.terrain === 'forest' || t.terrain === 'mountain' ? style : '');
       let s = this.sprites.get(key);
       if (s) return s;

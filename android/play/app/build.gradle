@@ -1,0 +1,120 @@
+// Chamas de Vardren — app da Google Play: o jogo (os mesmos arquivos da versão web) + Google Play Billing + AdMob/UMP.
+// Gera o Android App Bundle para a Play Store:  ./gradlew bundleRelease  → app/build/outputs/bundle/release/app-release.aab
+// Configuração secreta (IDs do AdMob, chave de upload): veja secrets.properties.example e android/play/README.md.
+import groovy.json.JsonSlurper
+
+plugins {
+    id 'com.android.application'
+}
+
+def repoRoot = rootProject.file('../..')
+def pkg = new JsonSlurper().parse(new File(repoRoot, 'package.json'))
+def (vMaj, vMin, vPat) = pkg.version.tokenize('.').collect { it as int }
+
+// -P / ~/.gradle/gradle.properties, variável de ambiente (vardren.admob.appId → VARDREN_ADMOB_APPID) ou secrets.properties
+def secrets = new Properties()
+def secretsFile = rootProject.file('secrets.properties')
+if (secretsFile.exists()) secretsFile.withInputStream { secrets.load(it) }
+def cfg = { String key ->
+    def v = project.findProperty(key) ?: System.getenv(key.toUpperCase().replace('.', '_')) ?: secrets.getProperty(key)
+    return v == null ? '' : v.toString().trim()
+}
+def q = { String s -> '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+
+// IDs de teste oficiais do AdMob: só no debug (anúncios de teste, sem receita)
+def TEST_APP_ID = 'ca-app-pub-3940256099942544~3347511713'
+def TEST_INTERSTITIAL = 'ca-app-pub-3940256099942544/1033173712'
+def TEST_REWARDED = 'ca-app-pub-3940256099942544/5224354917'
+def hasUploadKey = cfg('vardren.upload.storeFile') != ''
+
+def wwwRoot = layout.buildDirectory.dir('generated/vardren-assets').get().asFile
+
+android {
+    namespace 'io.github.lucassscassol.vardren'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'io.github.lucassscassol.vardren'
+        minSdk 23
+        targetSdk 36
+        // mesma regra do APK avulso (tools/build-apk.sh): 2.5.0 → 20500
+        versionCode vMaj * 10000 + vMin * 100 + vPat
+        versionName pkg.version
+        buildConfigField 'String', 'PLAY_LICENSE_KEY', q(cfg('vardren.play.licenseKey'))
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // a MainActivity, os ícones e o tema são os mesmos do APK avulso (android/src e android/res)
+    sourceSets {
+        main {
+            java.srcDirs += [new File(repoRoot, 'android/src')]
+            res.srcDirs += [new File(repoRoot, 'android/res')]
+            assets.srcDirs += [wwwRoot]
+        }
+    }
+
+    signingConfigs {
+        if (hasUploadKey) {
+            upload {
+                storeFile file(cfg('vardren.upload.storeFile'))
+                storePassword cfg('vardren.upload.storePassword')
+                keyAlias cfg('vardren.upload.keyAlias')
+                keyPassword cfg('vardren.upload.keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            manifestPlaceholders = [admobAppId: TEST_APP_ID]
+            buildConfigField 'String', 'AD_INTERSTITIAL', q(TEST_INTERSTITIAL)
+            buildConfigField 'String', 'AD_REWARDED', q(TEST_REWARDED)
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            manifestPlaceholders = [admobAppId: cfg('vardren.admob.appId')]
+            buildConfigField 'String', 'AD_INTERSTITIAL', q(cfg('vardren.admob.interstitial'))
+            buildConfigField 'String', 'AD_REWARDED', q(cfg('vardren.admob.rewarded'))
+            if (hasUploadKey) signingConfig signingConfigs.upload
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.android.billingclient:billing:9.1.0'
+    implementation 'com.google.android.gms:play-services-ads:25.4.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+}
+
+// O jogo vai para assets/www (tools/stage-www.sh: index.html, css, js, assets e as fontes locais)
+def stageWww = tasks.register('stageWww', Exec) {
+    description = 'Copia o jogo para os assets do app'
+    def out = new File(wwwRoot, 'www')
+    ['index.html', 'css', 'js', 'assets', 'android/fonts'].each { inputs.files(new File(repoRoot, it)) }
+    inputs.file(new File(repoRoot, 'tools/stage-www.sh'))
+    outputs.dir(out)
+    commandLine 'bash', new File(repoRoot, 'tools/stage-www.sh').absolutePath, out.absolutePath
+}
+tasks.named('preBuild') { dependsOn stageWww }
+
+// A versão da loja não sai sem os IDs reais do AdMob e sem a chave de upload
+gradle.taskGraph.whenReady { graph ->
+    if (!graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') }) return
+    def missing = ['vardren.admob.appId', 'vardren.admob.interstitial', 'vardren.admob.rewarded',
+                   'vardren.upload.storeFile', 'vardren.upload.storePassword', 'vardren.upload.keyAlias', 'vardren.upload.keyPassword'].findAll { !cfg(it) }
+    if (missing) throw new GradleException("Faltam configurações para a versão da loja: ${missing.join(', ')}. Veja android/play/README.md.")
+    if (['vardren.admob.appId', 'vardren.admob.interstitial', 'vardren.admob.rewarded'].any { cfg(it).startsWith('ca-app-pub-3940256099942544') }) {
+        throw new GradleException('A versão da loja está com IDs de teste do AdMob. Use os IDs do seu app (admob.google.com).')
+    }
+    if (!cfg('vardren.play.licenseKey')) logger.warn('Aviso: sem vardren.play.licenseKey, as assinaturas das compras não são conferidas no aparelho.')
+}

@@ -59,8 +59,14 @@
 
     siegeCut(c) {
       if (!c || !(c.siege > 0) || !this.isBesieged(c)) return 0;
-      return Math.min(PP.SIEGE.defCutMax, PP.SIEGE.defCut * c.siege);
+      return Math.min(PP.SIEGE.defCutMax, this.siegeRate(c) * c.siege);
     },
+
+    // Defesa perdida por turno de cerco (tribos podem acelerar: js/tribes-plus.js)
+    siegeRate(c) { return PP.SIEGE.defCut; },
+
+    // Lealdade que o Pregar dá numa cidade própria (tribos podem aumentar: js/tribes-plus.js)
+    preachGain(u) { return 20; },
 
     besiegers(c) {
       const out = [];
@@ -365,7 +371,7 @@
     u.cd[id] = this.turn + PP.ABILITIES.preach.cd;
     let effect;
     if (c.owner === u.owner) {
-      c.loyalty = Math.min(100, c.loyalty + 20);
+      c.loyalty = Math.min(100, c.loyalty + this.preachGain(u));
       effect = 'loyalty';
     } else if (this.atWar(u.owner, c.owner)) {
       c.loyalty = Math.max(0, c.loyalty - 15);

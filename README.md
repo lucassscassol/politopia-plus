@@ -12,7 +12,7 @@ Fantasia medieval sombria: paleta terrosa e acinzentada, texturas procedurais em
 
 - **Local:** abra `index.html` no navegador, ou sirva a pasta (`npm start` e acesse `http://localhost:8080`).
 - **GitHub Pages:** em *Settings → Pages*, publique a branch com a pasta raiz. No celular, use "Adicionar à tela inicial" para jogar em tela cheia.
-- **Android:** baixe e instale [`apk/ChamasDeVardren-2.4.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.4.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
+- **Android:** baixe e instale [`apk/ChamasDeVardren-2.5.0.apk`](https://github.com/lucassscassol/politopia-plus/raw/claude/lucid-gauss-64jsit/apk/ChamasDeVardren-2.5.0.apk) (ou gere com `tools/build-apk.sh`; veja [Android (APK)](#android-apk)). Funciona sem internet.
 
 Controles: toque/clique para selecionar, arraste para mover o mapa, pinça ou roda do mouse para zoom. Atalhos: `Enter` encerra o turno, `N` próxima unidade, `T` tecnologia, `D` diplomacia, `C` cidades, `R` reino, `O` objetivos, `Esc` fecha janelas.
 
@@ -125,6 +125,20 @@ Uma análise de partidas IA × IA mostrou o problema do meio para o fim da parti
 
 A manutenção, as vagas e os rebeldes podem ser desligados na criação da partida. Partidas antigas continuam sem manutenção, vagas, cerco e rebeldes, mas ganham o investimento, os projetos, as construções de segundo nível, os avanços do futuro, a coalizão e o Pregar.
 
+## 2.5: tribos da loja, anúncios e Play Store
+
+| Parte | Como funciona |
+| --- | --- |
+| **Tribos da loja** | **Kemet** (vale do rio), **Tarkhan** (estepes) e **Ériu** (colinas e bosques), com mapa, recursos típicos, árvores, nomes de cidades e ícones próprios (`js/tribes-plus.js`). A IA usa as três em qualquer versão. Para jogar com elas, é preciso comprar no app da Play: cada uma sozinha ou o pacote das três. |
+| **Equilíbrio** | Simulações IA × IA medem a liderança e a fatia dos pontos de cada tribo. A primeira versão, com duas tecnologias iniciais e bônus maiores, deixava as três acima das tribos gratuitas. Os números finais ficaram dentro da faixa delas: são jeitos diferentes de jogar, não tribos mais fortes. |
+| **Loja** | Botão *Loja* no menu principal (`js/store.js` e `js/ui-store.js`). As compras ficam na conta Google Play: o app consulta a conta a cada abertura e ao voltar para o jogo, e *Restaurar compras* força a consulta. Uma compra reembolsada deixa de valer. Na criação da partida, as tribos da loja aparecem com o selo *Loja*, e tocar nelas abre a loja. |
+| **Anúncios** | Só no app da Play: tela cheia apenas entre partidas (ao sair de uma ou começar outra), com 4 minutos de intervalo e nunca nos primeiros 2,5 minutos. No Tesouro há um vídeo opcional que rende 3★ + 1★ a cada 10 turnos (máximo 10★), uma vez a cada 10 turnos, só em partidas com um jogador. *Sem anúncios* tira os de tela cheia. O formulário de consentimento do Google aparece onde a lei exige, e *Privacidade e anúncios* reabre as opções. |
+| **Versões** | A **web** e o **APK avulso** (`apk/`) não têm loja nem anúncios. O **app da Play** (`android/play`) é um projeto Gradle com Google Play Billing 9.1, AdMob 25.4 e UMP 4.0, API alvo 36. |
+
+O passo a passo para publicar está em [`store/release-checklist.md`](store/release-checklist.md). O build do app da Play está em [`android/play/README.md`](android/play/README.md), e a ficha da loja (textos em 3 idiomas, política de privacidade, segurança dos dados, classificação e imagens) está em [`store/`](store/). As imagens saem de `node tools/store-graphics.js`.
+
+> O projeto `android/play` **ainda não foi compilado**. Onde ele foi escrito, o repositório de bibliotecas do Google estava bloqueado. O Java foi conferido com o compilador contra as assinaturas das bibliotecas; a primeira compilação no Android Studio pode precisar de ajustes pequenos.
+
 ## Regras de referência
 
 ### Tribos
@@ -137,6 +151,9 @@ A manutenção, as vagas e os rebeldes podem ser desligados na criação da part
 | 🐪 Qadir | Montaria (Cavaleiro Leve) | Capital +2★; cidades conectadas +1★ | +1 vaga de rota na capital; comércio melhora relações em dobro |
 | 🐉 Han-Lu | Organização | Tecnologias 15% mais baratas | Tecnologias já conhecidas por tribos encontradas −20%; cidades científicas sem perda de capacidade |
 | 🦁 Zambé | Caça + guerreiro extra | XP em dobro e cura +2 | Cura 3 ao abater; veteranos inspiram vizinhos (+10%) |
+| 🐊 Kemet (loja) | Organização | Fazendas dão +1 população; Celeiros custam metade | Maravilhas 20% mais baratas; +1★ por maravilha |
+| 🦅 Tarkhan (loja) | Montaria (Cavaleiro Leve) | Montados custam 1★ a menos e pagam metade da manutenção | Cidades sitiadas por eles perdem 20% de defesa por turno; cada tropa inimiga derrotada rende 2★ |
+| 🦌 Ériu (loja) | Meditação | Catedrais custam metade; cada Templo rende +1⚗ | Missionários −1★; Pregar dá +30 de lealdade; Festival pela metade |
 
 ### Combate
 
@@ -183,6 +200,8 @@ js/government.js      formas de governo, anarquia, impostos e empréstimos
 js/vassals.js         placar da guerra, termos de paz, trégua, vassalos, anexação e dominação por vassalos
 js/development.js     manutenção do exército, investimento, projetos de cidade, construções de segundo nível, vagas e avanços do futuro
 js/warfare.js         cerco, rebeldes (guerrilheiros e acampamentos), coalizão contra o líder e o Pregar do Missionário
+js/tribes-plus.js     tribos da loja (Kemet, Tarkhan, Ériu) e as regras de cada uma
+js/store.js           loja e anúncios: catálogo, posse das compras, ponte com o app (window.VardrenNative) e o vídeo opcional
 js/ai-strategy.js     objetivos da IA, análise, propostas e iniciativas diplomáticas
 js/ai.js              IA tática: pesquisa, economia, unidades, cerco, navegação (com pontos de extensão AI.ext)
 js/ai-realm.js        IA da organização do reino, da Era V e dos personagens
@@ -196,10 +215,15 @@ js/ui-crown.js        tela Reino (governo, impostos, tesouro, empréstimos, vass
 js/ui-development.js  crescimento, projetos e vagas na cidade, conta do exército, avanços do futuro, cerco e acampamentos no mapa
 js/audio.js           som: síntese dos efeitos, música generativa e motor Web Audio (a síntese roda no Node)
 js/ui-audio.js        som na interface: eventos da partida → efeitos, cliques, opções de volume
+js/ui-store.js        tela da loja, tribos travadas na criação da partida, anúncios entre partidas e o vídeo do Tesouro
 js/main.js            inicialização
 apk/                  APK pronto para instalar
 android/              app Android: manifesto, MainActivity (WebView), ícones, fontes locais e a chave de desenvolvimento
+android/play/         app da Google Play (Gradle): PlayActivity, Billing, AdMob e UMP; gera o .aab
+store/                ficha da Play Store: textos (pt-BR, en, es), política de privacidade, segurança dos dados, checklist e imagens
 tools/build-apk.sh    gera o APK sem Gradle (ferramentas Android do Ubuntu)
+tools/stage-www.sh    copia o jogo com as fontes locais para dentro de um app (usado pelo APK e pelo app da Play)
+tools/store-graphics.js  gera o ícone, o gráfico de destaque e as capturas da Play Store (Playwright)
 tools/android-icons.js  gera os ícones do app a partir de assets/icon.svg (Playwright)
 tests/load.js         carrega o motor no Node na mesma ordem do index.html
 tests/systems.js      testes de cada sistema (diplomacia, rotas, combate, naval, reino, personagens, governo, empréstimos, vassalos, manutenção, vagas, cerco, rebeldes, saves antigos...)
@@ -231,7 +255,9 @@ sudo apt-get install aapt apksigner zipalign dalvik-exchange android-sdk-platfor
 tools/build-apk.sh          # → dist/ChamasDeVardren-<versão>.apk (versão e versionCode vêm do package.json)
 ```
 
-O build não usa Gradle nem o SDK do Google, só as ferramentas Android empacotadas no Ubuntu/Debian; Android 5.0 (API 21) ou mais novo. O APK sai assinado com `android/vardren-debug.keystore` (senha `vardren`), uma chave de desenvolvimento **pública**: ela serve para que cada versão nova instale por cima da anterior sem apagar as partidas salvas, mas não protege nada e não serve para a Play Store. Para publicar na loja, gere uma chave própria e guarde-a fora do repositório (`VARDREN_KEYSTORE=... VARDREN_KEY_ALIAS=... VARDREN_KEY_PASS=... tools/build-apk.sh`); a loja também pede o formato AAB, que este script não gera. Trocar de chave obriga a desinstalar a versão antiga, o que apaga as partidas salvas no aparelho.
+O build não usa Gradle nem o SDK do Google, só as ferramentas Android empacotadas no Ubuntu/Debian; Android 5.0 (API 21) ou mais novo. O APK sai assinado com `android/vardren-debug.keystore` (senha `vardren`), uma chave de desenvolvimento **pública**: ela serve para que cada versão nova instale por cima da anterior sem apagar as partidas salvas, mas não protege nada e não serve para a Play Store. O APK avulso não tem loja nem anúncios: as tribos da loja aparecem só como adversárias da IA.
+
+A versão da **Play Store** é outro build: o projeto Gradle em [`android/play`](android/play/README.md) gera o AAB, com a loja e os anúncios, assinado pela sua chave de upload (fora do repositório) e pela Assinatura de apps do Google Play. Como as chaves são diferentes, quem tem o APK avulso instalado precisa desinstalá-lo antes de instalar o app da Play, e as partidas salvas nele se perdem.
 
 Para instalar no celular: copie o APK, abra-o e permita "instalar apps desconhecidos" para o app que abriu o arquivo (navegador ou gerenciador de arquivos).
 

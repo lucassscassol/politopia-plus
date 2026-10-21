@@ -282,5 +282,13 @@
  "b_bank2": "delapouite/money-stack",
  "b_granary2": "delapouite/grain-bundle",
  "b_temple2": "delapouite/saint-basil-cathedral",
- "b_barracks2": "delapouite/barracks"
+ "b_barracks2": "delapouite/barracks",
+ "tr_kemet": "lorc/ankh",
+ "tr_tarkhan": "delapouite/eagle-head",
+ "tr_eriu": "lorc/stag-head",
+ "ui_store": "delapouite/shop",
+ "ui_premium": "lorc/cut-diamond",
+ "ui_unlock": "delapouite/padlock-open",
+ "ui_ad": "delapouite/tv",
+ "ui_restore": "lorc/cycle"
 }

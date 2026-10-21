@@ -1,0 +1,3 @@
+# Publique este arquivo como https://<seu-site>/app-ads.txt (o site informado na ficha da Play Store).
+# Troque pub-0000000000000000 pelo seu ID de editor do AdMob (AdMob → Configurações → Informações da conta).
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

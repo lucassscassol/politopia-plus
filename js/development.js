@@ -95,6 +95,9 @@
       return PP.UPKEEP.top;
     },
 
+    // Manutenção de um tipo de tropa para um jogador (tribos podem mudar o custo: js/tribes-plus.js)
+    unitUpkeepFor(p, type) { return this.unitUpkeep(type); },
+
     // Tropas do jogador, incluindo as que estão a bordo de transportes
     armyOf(pid) {
       const out = [];
@@ -140,10 +143,10 @@
       let unsupplied = 0;
       for (const u of this.units) {
         if (u.owner !== p.id) continue;
-        let v = this.unitUpkeep(u.type);
+        let v = this.unitUpkeepFor(p, u.type);
         if (v && !UN[u.type].naval && this.isSupplied && !this.isSupplied(u)) { v *= PP.UPKEEP.unsupplied; unsupplied++; }
         if (v) list.push(v);
-        if (u.cargo && u.cargo.length) for (const x of u.cargo) { const w = this.unitUpkeep(x.type); if (w) list.push(w); }
+        if (u.cargo && u.cargo.length) for (const x of u.cargo) { const w = this.unitUpkeepFor(p, x.type); if (w) list.push(w); }
       }
       list.sort((a, b) => a - b);
       const free = this.freeSupport(p);
@@ -159,7 +162,7 @@
     // Quanto uma tropa nova deste tipo somaria à conta (0 enquanto houver vaga gratuita)
     upkeepPreview(p, type) {
       if (!this.upkeepOn()) return 0;
-      const v = this.unitUpkeep(type);
+      const v = this.unitUpkeepFor(p, type);
       if (!v) return 0;
       const up = this.upkeepOf(p);
       return up.units < up.free ? 0 : Math.round(v * up.mult * 10) / 10;
@@ -187,7 +190,7 @@
       let best = null, bv = -1;
       for (const u of this.units) {
         if (u.owner !== p.id || UN[u.type].character || (u.cargo && u.cargo.length)) continue;
-        const v = this.unitUpkeep(u.type);
+        const v = this.unitUpkeepFor(p, u.type);
         if (!v) continue;
         const s = (this.tileAt(u).city ? 0 : 100) + v * 10 - u.hp / 100;
         if (s > bv) { bv = s; best = u; }

@@ -746,7 +746,7 @@ function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p));
 
   await test('mapas: tamanhos Colossal e Titânico', async () => {
     for (const size of [32, 40]) {
-      const g = new PP.Game().setup({ seed: 900 + size, size, mapType: 'continentes', players: PP.TRIBE_IDS.map(t => ({ tribe: t })) });
+      const g = new PP.Game().setup({ seed: 900 + size, size, mapType: 'continentes', players: PP.TRIBE_IDS.slice(0, 6).map(t => ({ tribe: t })) });
       ok(g.W === size && g.cities.filter(c => c.capital).length === 6, size + ': seis capitais');
       ok(g.tiles.filter(t => t.village).length >= size, size + ': aldeias suficientes (' + g.tiles.filter(t => t.village).length + ')');
       for (let i = 0; i < 12; i++) { await PP.AI.takeTurn(g); g.endTurn(); }
@@ -1347,6 +1347,182 @@ function refresh(g) { g.invalidate(); g.players.forEach(p => g.updateVision(p));
     ok(ga.players.some(x => (x.stats.projects || 0) > 0), 'a IA faz projetos de cidade');
     ok(ga.players.some(x => (x.stats.upkeepPaid || 0) > 0), 'a IA paga manutenção');
     ok(ga.cities.every(x => ga.usedSlots(x) <= ga.buildSlots(x) || x.founder !== x.owner), 'a IA respeita as vagas nas próprias cidades');
+  });
+
+  // ---------------------------------------------------------------- 2.5: tribos da loja
+  await test('tribos da loja: dados, mapa, nomes e partida com a IA', async () => {
+    const ICONS = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tools', 'icons.json'), 'utf8'));
+    ok(PP.PREMIUM_TRIBES.join() === 'kemet,tarkhan,eriu' && PP.PREMIUM_TRIBES.every(t => PP.TRIBE_IDS.indexOf(t) >= 0), 'três tribos novas na lista');
+    ok(PP.isPremiumTribe('kemet') && PP.isPremiumTribe('eriu') && !PP.isPremiumTribe('vikar') && !PP.isPremiumTribe('nada'), 'só as novas são da loja');
+    ok(PP.PREMIUM_TRIBES.every(t => PP.TRIBES[t].premium === 'tribe_' + t && ICONS['tr_' + t]), 'produto e ícone de cada tribo');
+    const g = new PP.Game().setup({ seed: 2025, size: 22, mapType: 'continentes', players: ['kemet', 'tarkhan', 'eriu', 'vikar', 'qadir', 'aymara'].map(t => ({ tribe: t })) });
+    ok(g.cities.filter(c => c.capital).length === 6, 'seis capitais com as tribos novas');
+    const sig = { kemet: 'crop', tarkhan: 'horses', eriu: 'game' };
+    for (const p of g.players.slice(0, 3)) {
+      const cap = g.cityMap[p.capital];
+      ok(g.tiles.some(t => t.res === sig[p.tribe] && Math.max(Math.abs(t.x - cap.x), Math.abs(t.y - cap.y)) <= 1), p.tribe + ': recurso típico perto da capital');
+      ok(PP.TRIBES[p.tribe].syl[0].some(s => cap.name.indexOf(s) === 0), p.tribe + ': nome de cidade próprio (' + cap.name + ')');
+    }
+    ok(g.players[1].techs.montaria && g.unitsOf(1).some(u => u.type === 'rider') && g.players[0].techs.organizacao && g.players[2].techs.meditacao, 'tecnologias e tropas iniciais (Tarkhan: Montaria e um cavaleiro)');
+    for (let i = 0; i < 25 * 6 && !g.over; i++) { await PP.AI.takeTurn(g); if (!g.over) g.endTurn(); }
+    ok(g.turn >= 20, 'a IA joga com as tribos novas');
+    const json = JSON.stringify(g.toJSON());
+    ok(JSON.stringify(PP.Game.fromJSON(JSON.parse(json)).toJSON()) === json, 'salvar e carregar');
+  });
+
+  await test('Kemet: fazendas, celeiros e maravilhas', () => {
+    const g = blank({ tribes: ['kemet', 'vikar'] });
+    const c = city(g, 0, 3, 3, true), c1 = city(g, 1, 10, 10, true);
+    const p = g.players[0], q = g.players[1];
+    g.current = 0;
+    for (const x of [p, q]) x.techs.agricultura = true;
+    c.level = c1.level = 6; c.pop = c1.pop = 0;
+    g.tile(4, 3).res = 'crop'; g.tile(11, 10).res = 'crop';
+    ok(g.doTileAction(p, g.tile(4, 3), 'farm') && c.pop === 3, 'Fazenda: +1 população (' + c.pop + ')');
+    g.current = 1;
+    ok(g.doTileAction(q, g.tile(11, 10), 'farm') && c1.pop === 2, 'outras tribos: +2');
+    ok(g.buildingCost(p, 'granary', c) === 3 && g.buildingCost(q, 'granary', c1) === 6 && g.buildingCost(p, 'granary2', c) === 5, 'Celeiros pela metade');
+    c.spec = 'agricola';
+    ok(g.buildingCost(p, 'granary', c) === 3, 'sem somar com o desconto da cidade agrícola');
+    ok(g.wonderCost(p, 'pyramids') === Math.round(g.wonderCost(q, 'pyramids') * 0.8), 'maravilhas 20% mais baratas');
+    const s0 = g.income(p).stars;
+    g.wonders.pyramids = 0;
+    const inc = g.income(p);
+    ok(inc.lines.some(l => l.label === PP.t('Construtores eternos') && l.stars === 1), 'cada maravilha rende +1★ (linha na renda)');
+    ok(inc.stars - s0 >= 1, 'renda maior com a maravilha');
+    g.wonders.pyramids = 1;
+    ok(!g.income(q).lines.some(l => l.label === PP.t('Construtores eternos')), 'só para os Kemet');
+  });
+
+  await test('Tarkhan: montados, manutenção, cerco e saque', () => {
+    const g = blank({ tribes: ['tarkhan', 'vikar'], upkeep: true, siege: true });
+    const c0 = city(g, 0, 3, 3, true); const c = city(g, 1, 10, 10, true);
+    const p = g.players[0], q = g.players[1];
+    ok(g.unitCost(p, c0, 'rider') === 2 && g.unitCost(q, c, 'rider') === 3 && g.unitCost(p, c0, 'knight') === 7 && g.unitCost(p, c0, 'warrior') === g.unitCost(q, c, 'warrior'), 'montados custam 1★ a menos');
+    ok(g.unitUpkeepFor(p, 'knight') === 0.75 && g.unitUpkeepFor(q, 'knight') === 1.5 && g.unitUpkeepFor(p, 'swordsman') === 1, 'montados pagam metade da manutenção');
+    for (const [x, y] of [[2, 4], [4, 4], [2, 2], [4, 2]]) unit(g, 'knight', 0, x, y);
+    refresh(g);
+    ok(g.upkeepOf(p).raw === 0.75 * 2, 'conta do exército com o desconto (' + g.upkeepOf(p).raw + ')');
+    const gar = unit(g, 'defender', 1, 10, 10);
+    const a = unit(g, 'swordsman', 0, 9, 10); unit(g, 'swordsman', 0, 11, 10);
+    refresh(g);
+    g.turn = 2; g.current = 1;
+    g.updateSieges(q);
+    ok(c.siege === 1 && Math.abs(g.siegeCut(c) - 0.2) < 1e-9, 'cerco: −20% por turno');
+    g.updateSieges(q);
+    ok(Math.abs(g.siegeCut(c) - PP.SIEGE.defCutMax) < 1e-9, 'mesmo teto de −40%');
+    const s = p.stars;
+    g.killUnit(gar, a);
+    ok(p.stars === s + 2 && p.stats.loot >= 2, 'tropa inimiga derrotada rende 2★');
+    const v = unit(g, 'warrior', 1, 12, 12), w = unit(g, 'warrior', 1, 12, 13);
+    const s1 = q.stars;
+    g.killUnit(w, v);
+    ok(q.stars === s1, 'outras tribos não saqueiam');
+    const g2 = blank({ tribes: ['vikar', 'qadir'], siege: true });
+    const c2 = city(g2, 1, 10, 10, true);
+    unit(g2, 'swordsman', 0, 9, 10); unit(g2, 'swordsman', 0, 11, 10);
+    refresh(g2); g2.turn = 2; g2.current = 1;
+    g2.updateSieges(g2.players[1]);
+    ok(Math.abs(g2.siegeCut(c2) - PP.SIEGE.defCut) < 1e-9, 'cerco comum: −10%');
+  });
+
+  await test('Ériu: catedrais, templos, missionários, Pregar e Festival', () => {
+    const g = blank({ tribes: ['eriu', 'vikar'] });
+    const c = city(g, 0, 3, 3, true); const c1 = city(g, 1, 10, 10, true);
+    const p = g.players[0], q = g.players[1];
+    ok(g.buildingCost(p, 'temple2', c) === 7 && g.buildingCost(q, 'temple2', c1) === 14 && g.buildingCost(p, 'temple', c) === 8, 'Catedrais pela metade (Templos com o preço normal)');
+    const sci0 = g.cityIncome(c).sci;
+    c.buildings.temple = true; c1.buildings.temple = true;
+    ok(g.cityIncome(c).sci === sci0 + 1, 'Templo rende +1⚗');
+    const q0 = g.cityIncome(c1).sci; delete c1.buildings.temple;
+    ok(g.cityIncome(c1).sci === q0, 'só para os Ériu');
+    ok(g.unitCost(p, c, 'missionary') === 4 && g.unitCost(q, c1, 'missionary') === 5, 'Missionários 1★ mais baratos');
+    ok(g.cprojCost(c, 'festival') === Math.ceil(g.cprojCost(c1, 'festival') / 2), 'Festival pela metade');
+    g.current = 0;
+    const conq = city(g, 0, 7, 7); conq.founder = 1; conq.loyalty = 30;
+    const m = unit(g, 'missionary', 0, 8, 7);
+    refresh(g);
+    ok(g.useAbility(m, 'preach') && conq.loyalty === 60, 'Pregar: +30 de lealdade (' + conq.loyalty + ')');
+  });
+
+  await test('loja: ponte com o app, compras, pacote, reembolso, cache e anúncios', () => {
+    const st = PP.store;
+    ok(!st.native() && !st.available() && !st.tribeUnlocked('kemet') && st.tribeUnlocked('vikar') && !st.buy('tribe_kemet') && !st.maybeInterstitial(), 'sem o app: loja fechada, tribos da loja travadas e sem anúncios');
+    const calls = [];
+    const mem = {};
+    globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+    globalThis.window = { VardrenNative: {
+      info: () => JSON.stringify({ billing: true, ads: true }), init: () => calls.push('init'), buy: id => calls.push('buy:' + id), restore: () => calls.push('restore'),
+      showInterstitial: () => { calls.push('inter'); return true; }, showRewarded: () => { calls.push('rew'); return true; }, privacyOptions: () => calls.push('priv'), setAdsRemoved: v => calls.push('noads:' + v),
+    } };
+    const reset = () => Object.assign(st, { owned: {}, prices: {}, pending: {}, listeners: [], billing: false, ads: false, canAds: true, synced: false, lastAd: 0, rewardCb: null });
+    try {
+      reset();
+      const evs = [];
+      st.on(m => evs.push(m.ev));
+      st.init();
+      ok(calls[0] === 'init' && st.available() && st.adsActive(), 'o app abre a loja e os anúncios');
+      st.fromNative('{"ev":"products","list":[{"id":"tribe_kemet","price":"R$ 4,99"},{"id":"falso","price":"1"}]}');
+      ok(st.price('tribe_kemet') === 'R$ 4,99' && !st.prices.falso && evs.indexOf('products') >= 0, 'preços vindos da Play Store (só produtos do catálogo)');
+      ok(st.buy('tribe_kemet') && calls.indexOf('buy:tribe_kemet') >= 0 && !st.buy('nada'), 'comprar chama o app');
+      st.fromNative({ ev: 'purchase', id: 'tribe_kemet', state: 'pending' });
+      ok(st.pending.tribe_kemet && !st.tribeUnlocked('kemet'), 'pagamento pendente não libera');
+      st.fromNative({ ev: 'purchase', id: 'tribe_kemet', state: 'ok' });
+      ok(st.tribeUnlocked('kemet') && !st.pending.tribe_kemet && !st.tribeUnlocked('eriu') && !st.buy('tribe_kemet'), 'compra concluída libera só a tribo comprada');
+      ok(JSON.parse(mem['vardren-owned']).indexOf('tribe_kemet') >= 0, 'guardada no aparelho');
+      st.fromNative({ ev: 'owned', list: ['tribes_bundle'] });
+      ok(PP.PREMIUM_TRIBES.every(t => st.tribeUnlocked(t)) && !st.owns('tribe_kemet') && st.productOwned('tribes_bundle'), 'o pacote libera as três; a lista da conta substitui a do aparelho');
+      st.fromNative({ ev: 'owned', list: [] });
+      ok(!PP.PREMIUM_TRIBES.some(t => st.tribeUnlocked(t)) && mem['vardren-owned'] === '[]', 'compra reembolsada deixa de valer');
+      st.fromNative({ ev: 'owned', list: ['tribe_eriu', 'tribe_tarkhan'] });
+      ok(st.productOwned('tribes_bundle') === false, 'pacote só conta como seu quando tem as três');
+      reset(); st.init();
+      ok(st.tribeUnlocked('eriu') && st.tribeUnlocked('tarkhan') && !st.synced, 'sem internet: vale a última resposta da Play Store');
+      ok(st.restore() && calls.indexOf('restore') >= 0, 'restaurar compras');
+      st.fromNative('isto não é json');
+      // anúncios de tela cheia: carência, intervalo e Sem anúncios
+      st.started = Date.now() / 1000;
+      ok(!st.maybeInterstitial(), 'nada logo depois de abrir o app');
+      st.started -= 1000;
+      ok(st.maybeInterstitial() && !st.maybeInterstitial(), 'um anúncio e depois o intervalo mínimo');
+      st.lastAd -= 1000;
+      st.fromNative({ ev: 'purchase', id: 'remove_ads', state: 'ok' });
+      ok(!st.interstitialsOn() && !st.maybeInterstitial() && calls.indexOf('noads:true') >= 0 && st.adsActive(), 'Sem anúncios: sem tela cheia (o vídeo opcional continua)');
+      st.fromNative({ ev: 'consent', canAds: false, privacyRequired: true });
+      ok(!st.adsActive() && st.privacyRequired && st.privacyOptions(), 'sem consentimento: sem anúncios; opções de privacidade');
+      st.fromNative({ ev: 'consent', canAds: true });
+      // vídeo opcional do tesouro
+      const g = blank({ players: 2, humans: [0] });
+      city(g, 0, 3, 3, true); city(g, 1, 10, 10, true);
+      const p = g.players[0];
+      g.current = 0; g.turn = 2;
+      ok(!g.adBonusCheck(p).ok, 'só a partir do turno 3');
+      g.turn = 12;
+      const s0 = p.stars, amt = g.adBonusAmount();
+      ok(amt === 4 && g.adBonusCheck(p).ok, 'rende 3★ + 1★ a cada 10 turnos');
+      let got = 0;
+      ok(st.showRewarded(() => { got++; g.grantAdBonus(p); }), 'abre o vídeo');
+      st.fromNative({ ev: 'ad', kind: 'rewarded', state: 'shown' });
+      st.fromNative({ ev: 'ad', kind: 'rewarded', state: 'reward' });
+      st.fromNative({ ev: 'ad', kind: 'rewarded', state: 'closed' });
+      ok(got === 1 && p.stars === s0 + amt && p.adBonusTurn === 12, 'recompensa só depois de o app confirmar');
+      g.turn = 21;
+      ok(!g.adBonusCheck(p).ok && g.adBonusCheck(p).next === 22, 'uma vez a cada 10 turnos');
+      g.turn = 22;
+      st.showRewarded(() => { got++; });
+      st.fromNative({ ev: 'ad', kind: 'rewarded', state: 'closed' });
+      st.fromNative({ ev: 'ad', kind: 'rewarded', state: 'reward' });
+      ok(got === 1, 'fechar o vídeo antes do fim não rende nada');
+      g.players[1].human = true;
+      ok(!g.adBonusCheck(p).ok && g.adBonusCheck(p).multi && !g.grantAdBonus(p), 'não vale com dois humanos no aparelho');
+      g.players[1].human = false;
+      refresh(g);
+      const json = JSON.stringify(g.toJSON());
+      ok(JSON.stringify(PP.Game.fromJSON(JSON.parse(json)).toJSON()) === json && PP.Game.fromJSON(JSON.parse(json)).players[0].adBonusTurn === 12, 'salvar e carregar');
+    } finally {
+      delete globalThis.window; delete globalThis.localStorage;
+      reset();
+    }
   });
 
   console.log(`\n${passed} verificações ok, ${failed} falhas`);

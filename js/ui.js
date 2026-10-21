@@ -343,12 +343,14 @@
       const me = s.slots[0];
       const tribeCards = PP.TRIBE_IDS.map(id => {
         const t = PP.TRIBES[id];
-        return `<button type="button" class="tribe-card ${me.tribe === id ? 'on' : ''}" style="--tribe:${t.color}" data-s="tribe" data-v="${id}">
-          ${crest(t.color, tribeIcon(id), 'crest-m')}<span><span class="tn">${t.name}</span><span class="tp">${esc(t.perk)} ${t.extraTech ? PP.t('Começa com {a} e {b}.', { a: PP.TECH[t.startTech].name, b: PP.TECH[t.extraTech].name }) : PP.t('Começa com {a}.', { a: PP.TECH[t.startTech].name })}</span></span></button>`;
+        const lockd = this.tribeLocked && this.tribeLocked(id);
+        return `<button type="button" class="tribe-card ${me.tribe === id ? 'on' : ''} ${lockd ? 'locked' : ''}" style="--tribe:${t.color}" data-s="tribe" data-v="${id}">
+          ${crest(t.color, tribeIcon(id), 'crest-m')}<span><span class="tn">${t.name}${t.premium ? ` <span class="tag gold">${lockd ? PP.t('Loja') : PP.t('Liberada')}</span>` : ''}</span><span class="tp">${esc(t.perk)} ${t.extraTech ? PP.t('Começa com {a} e {b}.', { a: PP.TECH[t.startTech].name, b: PP.TECH[t.extraTech].name }) : PP.t('Começa com {a}.', { a: PP.TECH[t.startTech].name })}</span></span></button>`;
       }).join('');
       const slots = s.slots.map((sl, i) => {
         const t = PP.TRIBES[sl.tribe];
-        const opts = PP.TRIBE_IDS.map(id => `<option value="${id}" ${id === sl.tribe ? 'selected' : ''}>${PP.TRIBES[id].name}</option>`).join('');
+        // tribos da loja: só a IA usa sem a compra
+        const opts = PP.TRIBE_IDS.map(id => { const lk = (i === 0 || sl.human) && this.tribeLocked && this.tribeLocked(id); return `<option value="${id}" ${id === sl.tribe ? 'selected' : ''} ${lk ? 'disabled' : ''}>${PP.TRIBES[id].name}${lk ? ' 🔒' : ''}</option>`; }).join('');
         return `<div class="slot">${crest(t.color, tribeIcon(sl.tribe), 'crest-s')}
           <select id="slot-tribe-${i}" data-slot="${i}" aria-label="${PP.t('Tribo do jogador {n}', { n: i + 1 })}">${opts}</select>
           <div class="seg">${i === 0 ? '<button type="button" class="on" disabled>' + PP.t('Você') + '</button>' :
@@ -375,7 +377,7 @@
         const b = e.target.closest('[data-s]');
         if (!b) return;
         const a = b.dataset.s;
-        if (a === 'tribe') this.setSlotTribe(0, b.dataset.v);
+        if (a === 'tribe') { if (this.tribeLocked && this.tribeLocked(b.dataset.v)) { this.openStore(b.dataset.v); return; } this.setSlotTribe(0, b.dataset.v); }
         else if (a === 'ai' || a === 'human') s.slots[+b.dataset.i].human = a === 'human';
         else if (a === 'del') s.slots.splice(+b.dataset.i, 1);
         else if (a === 'add') { const free = PP.TRIBE_IDS.find(t => !s.slots.some(x => x.tribe === t)); if (free) s.slots.push({ tribe: free, human: false }); }
@@ -1577,7 +1579,7 @@
     }
 
     openHelp() {
-      const tribes = PP.TRIBE_IDS.map(id => `<li><b>${PP.TRIBES[id].name}</b>: ${esc(PP.TRIBES[id].perk)}</li>`).join('');
+      const tribes = PP.TRIBE_IDS.map(id => `<li><b>${PP.TRIBES[id].name}</b>${PP.TRIBES[id].premium ? ` <span class="tag gold">${PP.t('Loja')}</span>` : ''}: ${esc(PP.TRIBES[id].perk)}</li>`).join('');
       const credits = (PP.ICON_CREDITS || []).join(', ');
       const v = { sci: SCI, n: PP.OCCUPATION_TURNS };
       const h = k => `<h3>${PP.t(k)}</h3>`;
@@ -1655,6 +1657,9 @@
           ${h('Maravilhas')}
           ${p('Cada maravilha só pode ser construída uma vez no mundo, numa casa vazia do seu território. Todas dão +3 de população à cidade e 500 pontos, além do efeito próprio.')}
           ${h('Tribos')}<ul>${tribes}</ul>
+          ${h('Loja e anúncios')}
+          ${p('No app da Google Play, a <b>Loja</b> (menu principal) libera as tribos Kemet, Tarkhan e Ériu para você jogar, sozinhas ou no pacote das três, e vende a opção <b>Sem anúncios</b>. As compras ficam na sua conta Google Play: depois de reinstalar o jogo ou num aparelho novo, use <b>Restaurar compras</b>. As tribos da loja têm jeitos próprios de jogar, não são mais fortes que as outras, e a IA pode usá-las mesmo sem compra.')}
+          ${p('Os anúncios aparecem só entre as partidas (ao sair de uma partida ou começar outra), com alguns minutos de intervalo, nunca no meio dos turnos. No <b>Tesouro</b> (tela Reino) há um vídeo opcional que rende estrelas uma vez a cada 10 turnos, só em partidas com um jogador. Fora do app não há loja nem anúncios.')}
           ${h('Ruínas')}
           ${p('Ruínas marcadas com <b>?</b> têm um tipo (fortaleza, templo, biblioteca, acampamento ou túmulo). Quem chega escolhe: <b>Explorar</b> (prêmio aleatório: estrelas, ciência, tecnologia, veterano, mapa ou população), <b>Saquear</b> (estrelas na hora, mas as outras tribos lembram), <b>Restaurar</b> (vira forte, posto ou santuário) ou <b>Honrar</b> (túmulos).')}
           ${h('Créditos')}
